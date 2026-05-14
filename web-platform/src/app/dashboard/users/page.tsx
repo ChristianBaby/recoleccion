@@ -1,7 +1,7 @@
 'use client';
 
 import { useApi } from '@/hooks/useApi';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Search, Filter, UserPlus, MoreHorizontal, UserCheck, UserX, MapPin, Users } from 'lucide-react';
 
 interface UserData {

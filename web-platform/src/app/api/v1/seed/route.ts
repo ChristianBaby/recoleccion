@@ -12,6 +12,12 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
+    await User.deleteMany({});
+    await Zone.deleteMany({});
+    await WasteType.deleteMany({});
+    await Vehicle.deleteMany({});
+    await Route.deleteMany({});
+
     // Create admin
     const adminPassword = await bcrypt.hash('admin123', 12);
     const admin = await User.findOneAndUpdate(

@@ -3,7 +3,7 @@
 import { useApi } from '@/hooks/useApi';
 import { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Map as MapIcon, Info, MapPin, Layers } from 'lucide-react';
+import { Map as MapIcon, Info, MapPin, Layers, ChevronRight } from 'lucide-react';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });

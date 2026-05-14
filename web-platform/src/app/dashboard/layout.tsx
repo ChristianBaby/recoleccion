@@ -4,19 +4,20 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Map as MapIcon, 
-  Recycle, 
-  Truck, 
-  Radio, 
-  LogOut, 
-  ChevronLeft, 
+import {
+  LayoutDashboard,
+  Users,
+  Map as MapIcon,
+  Recycle,
+  Truck,
+  Radio,
+  LogOut,
+  ChevronLeft,
   ChevronRight,
   Leaf,
   Menu,
-  X
+  X,
+  Bell
 } from 'lucide-react';
 
 const menuItems = [
@@ -33,6 +34,15 @@ const menuItems = [
     operator: 'Operador',
     citizen: 'Ciudadano',
   };
+
+const pageTitles: Record<string, string> = {
+  '/dashboard': 'Resumen General',
+  '/dashboard/users': 'Gestión de Usuarios',
+  '/dashboard/zones': 'Zonas de Recolección',
+  '/dashboard/waste-types': 'Tipos de Residuos',
+  '/dashboard/routes': 'Rutas de Recolección',
+  '/dashboard/tracking': 'Seguimiento GPS',
+};
 
 interface NavContentProps {
   collapsed: boolean;
@@ -82,17 +92,14 @@ const NavContent = ({
             href={item.href}
             onClick={() => setMobileMenuOpen(false)}
             className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative ${
-              isActive 
-                ? 'bg-emerald-50 text-emerald-700' 
+              isActive
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            {isActive && (
-              <div className="absolute left-0 w-1 h-6 bg-emerald-500 rounded-full" />
-            )}
-            <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? 'text-emerald-600' : 'group-hover:text-emerald-500'}`} />
+            <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? 'text-white' : 'group-hover:text-emerald-500'}`} />
             {!collapsed && (
-              <span className="text-sm font-bold tracking-tight">
+              <span className={`text-sm font-bold tracking-tight ${isActive ? 'text-white' : ''}`}>
                 {item.label}
               </span>
             )}
@@ -199,6 +206,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Desktop Header */}
+        <header className="hidden lg:flex h-16 bg-white border-b border-slate-100 items-center px-8 shrink-0 gap-4 z-20">
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="text-sm text-slate-400 font-semibold shrink-0">EcoRutas</span>
+            <ChevronRight className="w-4 h-4 text-slate-200 shrink-0" />
+            <span className="text-sm font-bold text-slate-800 truncate">
+              {pageTitles[pathname] ?? 'Panel'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-all">
+              <Bell className="w-[18px] h-[18px]" />
+              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+            </button>
+            <div className="h-5 w-px bg-slate-100 mx-1" />
+            <div className="flex items-center gap-3 pl-1 pr-3 py-1.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xs shadow-md shadow-emerald-500/20">
+                {user.firstName[0]}{user.lastName[0]}
+              </div>
+              <div className="hidden xl:block">
+                <div className="text-sm font-bold text-slate-800 leading-tight">{user.firstName} {user.lastName}</div>
+                <div className="text-[11px] text-slate-400 font-semibold">{roleLabels[user.role]}</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
         {/* Mobile Header */}
         <header className="lg:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-2">

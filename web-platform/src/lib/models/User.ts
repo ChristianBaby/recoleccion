@@ -33,7 +33,7 @@ const UserSchema = new Schema<IUser>(
     phone: { type: String, trim: true },
     address: { type: String, required: true, trim: true },
     location: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
+      type: { type: String, enum: ['Point'] },
       coordinates: { type: [Number] },
     },
     zone: { type: Schema.Types.ObjectId, ref: 'Zone' },
@@ -45,7 +45,7 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-UserSchema.index({ location: '2dsphere' });
+UserSchema.index({ location: '2dsphere' }, { sparse: true });
 UserSchema.index({ zone: 1 });
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
