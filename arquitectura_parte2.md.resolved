@@ -1,0 +1,526 @@
+# Arquitectura del Sistema — Parte 2
+## Modelos, Flujos y Socket.IO
+
+---
+
+## 6. Diseño de Modelos MongoDB/Mongoose
+
+### User
+```typescript
+{
+  _id: ObjectId,
+  email: string,               // unique, indexed
+  password: string,            // bcrypt hash
+  dni: string,                 // unique
+  firstName: string,
+  lastName: string,
+  role: 'citizen' | 'operator' | 'admin',
+  phone?: string,
+  address: string,
+  location: {                  // GeoJSON Point
+    type: 'Point',
+    coordinates: [lng, lat]
+  },
+  zone: ObjectId,              // ref: Zone
+  fcmToken?: string,           // Firebase token
+  isActive: boolean,
+  isVerified: boolean,
+  verificationCode?: string,
+  failedLoginAttempts: number,
+  lockedUntil?: Date,
+  notificationPreferences: {
+    proximity: boolean,
+    delays: boolean,
+    incidentUpdates: boolean,
+    radiusMeters: number       // default: 500
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
+// Índices: email (unique), dni (unique), location (2dsphere), zone
+```
+
+### Zone
+```typescript
+{
+  _id: ObjectId,
+  name: string,                // unique
+  description: string,
+  district: string,
+  geometry: {                  // GeoJSON Polygon
+    type: 'Polygon',
+    coordinates: [[[lng, lat], ...]]
+  },
+  color: string,               // Para visualización en mapa
+  isActive: boolean,
+  createdBy: ObjectId,         // ref: User (admin)
+  createdAt: Date,
+  updatedAt: Date
+}
+// Índices: geometry (2dsphere), name (unique)
+```
+
+### Route
+```typescript
+{
+  _id: ObjectId,
+  name: string,
+  zone: ObjectId,              // ref: Zone
+  vehicle: ObjectId,           // ref: Vehicle
+  operator: ObjectId,          // ref: User
+  wasteTypes: [ObjectId],      // ref: WasteType
+  schedule: {
+    dayOfWeek: number[],       // 0=Dom, 1=Lun, ...
+    startTime: string,         // "06:00"
+    estimatedDuration: number  // minutos
+  },
+  waypoints: [{                // Paradas ordenadas
+    order: number,
+    name: string,
+    location: {
+      type: 'Point',
+      coordinates: [lng, lat]
+    },
+    estimatedArrival: string   // "06:15"
+  }],
+  path: {                      // GeoJSON LineString
+    type: 'LineString',
+    coordinates: [[lng, lat], ...]
+  },
+  status: 'active' | 'inactive' | 'draft',
+  createdBy: ObjectId,
+  createdAt: Date,
+  updatedAt: Date
+}
+// Índices: zone, operator, vehicle, path (2dsphere)
+```
+
+### RouteExecution
+```typescript
+{
+  _id: ObjectId,
+  route: ObjectId,             // ref: Route
+  operator: ObjectId,          // ref: User
+  vehicle: ObjectId,           // ref: Vehicle
+  date: Date,
+  startedAt: Date,
+  endedAt?: Date,
+  status: 'in_progress' | 'completed' | 'cancelled' | 'delayed',
+  waypointsVisited: [{
+    waypoint: number,          // order del waypoint
+    arrivedAt: Date,
+    skipped: boolean,
+    skipReason?: string
+  }],
+  collectionData: {
+    organicKg: number,
+    recyclableKg: number,
+    nonRecyclableKg: number,
+    observations: string
+  },
+  incidents: [ObjectId],       // ref: Incident
+  delayMinutes: number,
+  createdAt: Date
+}
+// Índices: route + date (compound), operator, status
+```
+
+### GpsTrack
+```typescript
+{
+  _id: ObjectId,
+  routeExecution: ObjectId,    // ref: RouteExecution
+  operator: ObjectId,          // ref: User
+  location: {
+    type: 'Point',
+    coordinates: [lng, lat]
+  },
+  speed: number,               // km/h
+  heading: number,             // grados
+  accuracy: number,            // metros
+  timestamp: Date,
+  batteryLevel?: number
+}
+// Índices: routeExecution + timestamp (compound), location (2dsphere)
+// TTL Index: timestamp (expira a los 90 días)
+```
+
+### Incident
+```typescript
+{
+  _id: ObjectId,
+  code: string,                // Código de seguimiento auto-generado
+  type: 'accumulation' | 'damaged_container' | 'missed_collection'
+       | 'road_blocked' | 'vehicle_breakdown' | 'other',
+  reportedBy: ObjectId,        // ref: User
+  reporterRole: 'citizen' | 'operator',
+  description: string,
+  images: [string],            // URLs (Cloudinary)
+  location: {
+    type: 'Point',
+    coordinates: [lng, lat]
+  },
+  address: string,
+  zone: ObjectId,              // ref: Zone
+  status: 'pending' | 'in_review' | 'in_progress' | 'resolved' | 'dismissed',
+  priority: 'low' | 'medium' | 'high' | 'critical',
+  assignedTo?: ObjectId,       // ref: User (admin)
+  resolution?: {
+    description: string,
+    resolvedAt: Date,
+    resolvedBy: ObjectId
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
+// Índices: code (unique), location (2dsphere), zone, status, reportedBy
+```
+
+### Vehicle
+```typescript
+{
+  _id: ObjectId,
+  plate: string,               // unique
+  type: 'compactor' | 'open_truck' | 'mini_truck',
+  capacity: number,            // toneladas
+  brand: string,
+  model: string,
+  year: number,
+  status: 'available' | 'in_route' | 'maintenance' | 'inactive',
+  currentLocation?: {
+    type: 'Point',
+    coordinates: [lng, lat]
+  },
+  lastMaintenanceDate?: Date,
+  isActive: boolean,
+  createdAt: Date
+}
+// Índices: plate (unique), status
+```
+
+### WasteType
+```typescript
+{
+  _id: ObjectId,
+  name: string,                // unique
+  category: 'organic' | 'recyclable' | 'non_recyclable' | 'hazardous',
+  description: string,
+  examples: string[],
+  handlingInstructions: string,
+  colorCode: string,           // NTP 900.058
+  icon: string,                // URL
+  isActive: boolean,
+  createdAt: Date
+}
+```
+
+### Notification
+```typescript
+{
+  _id: ObjectId,
+  recipient: ObjectId,         // ref: User
+  type: 'proximity' | 'delay' | 'incident_update' | 'schedule_change'
+       | 'general' | 'system',
+  title: string,
+  body: string,
+  data: Record<string, any>,   // Payload adicional
+  channel: 'push' | 'in_app' | 'both',
+  isRead: boolean,
+  sentAt: Date,
+  readAt?: Date
+}
+// Índices: recipient + sentAt (compound), isRead
+// TTL Index: sentAt (expira a los 60 días)
+```
+
+---
+
+## 7. Relaciones entre Colecciones
+
+```
+┌──────────┐ 1     N ┌───────────┐ 1     N ┌───────────────┐
+│   Zone   │─────────│   User    │─────────│  Notification  │
+└────┬─────┘         └─────┬─────┘         └───────────────┘
+     │ 1                   │ 1
+     │ N                   │ N
+┌────▼─────┐         ┌─────▼─────┐
+│  Route   │         │ Incident  │
+└────┬─────┘         └───────────┘
+     │ 1
+     │ N
+┌────▼──────────┐  1     N  ┌──────────┐
+│RouteExecution │───────────│ GpsTrack │
+└───────────────┘           └──────────┘
+
+Route ──N:1──▶ Vehicle
+Route ──N:1──▶ User (operator)
+Route ──N:M──▶ WasteType
+RouteExecution ──N:1──▶ Route
+Incident ──N:1──▶ Zone
+Incident ──N:1──▶ User (reportedBy)
+```
+
+### Estrategia de Referencias vs. Embedding
+
+| Relación | Estrategia | Justificación |
+|----------|-----------|---------------|
+| Zone → Users | Referencia (zone en User) | Muchos usuarios por zona |
+| Route → Waypoints | Embedding (array en Route) | Siempre se leen juntos, máx ~50 |
+| RouteExecution → GpsTrack | Referencia | Miles de puntos GPS por ejecución |
+| RouteExecution → waypointsVisited | Embedding | Pocos datos, siempre juntos |
+| Incident → images | Embedding (URLs) | Máx 5 imágenes |
+| User → notificationPrefs | Embedding | Subdocumento pequeño |
+
+---
+
+## 8. Flujo de Autenticación JWT
+
+```
+┌──────────┐                    ┌───────────┐                  ┌─────────┐
+│  Cliente  │                    │  Backend  │                  │ MongoDB │
+└─────┬────┘                    └─────┬─────┘                  └────┬────┘
+      │                               │                             │
+      │  POST /api/v1/auth/login      │                             │
+      │  {email, password}            │                             │
+      │──────────────────────────────▶│                             │
+      │                               │  findOne({email})           │
+      │                               │────────────────────────────▶│
+      │                               │◀────────────────────────────│
+      │                               │                             │
+      │                               │  bcrypt.compare(password)   │
+      │                               │  ✓ válido                   │
+      │                               │                             │
+      │                               │  Genera accessToken (15min) │
+      │                               │  Genera refreshToken (7d)   │
+      │                               │                             │
+      │  200 {accessToken,            │                             │
+      │       refreshToken, user}     │                             │
+      │◀──────────────────────────────│                             │
+      │                               │                             │
+      │  GET /api/v1/zones            │                             │
+      │  Authorization: Bearer <AT>   │                             │
+      │──────────────────────────────▶│                             │
+      │                               │  jwt.verify(AT)             │
+      │                               │  checkRole('admin')         │
+      │                               │  ✓ autorizado               │
+      │  200 {zones: [...]}           │                             │
+      │◀──────────────────────────────│                             │
+      │                               │                             │
+      │  ─── Token expirado ───       │                             │
+      │                               │                             │
+      │  POST /api/v1/auth/refresh    │                             │
+      │  {refreshToken}               │                             │
+      │──────────────────────────────▶│                             │
+      │                               │  jwt.verify(RT)             │
+      │  200 {newAccessToken}         │                             │
+      │◀──────────────────────────────│                             │
+```
+
+### Estructura del JWT Payload
+```json
+{
+  "sub": "userId",
+  "email": "user@mail.com",
+  "role": "admin",
+  "zone": "zoneId",
+  "iat": 1700000000,
+  "exp": 1700000900
+}
+```
+
+### Seguridad JWT
+- **Access Token**: 15 minutos, almacenado en memoria (mobile) / httpOnly cookie (web)
+- **Refresh Token**: 7 días, almacenado en SecureStore (mobile) / httpOnly cookie (web)
+- **Rotación**: Cada refresh genera un nuevo refresh token e invalida el anterior
+- **Blacklist**: Tokens revocados almacenados en MongoDB con TTL index
+
+---
+
+## 9. Flujo GPS en Tiempo Real
+
+```
+┌─────────────┐       ┌─────────────┐       ┌──────────┐       ┌──────────┐
+│  Operador   │       │  Socket.IO  │       │ Backend  │       │ MongoDB  │
+│  (Mobile)   │       │  Server     │       │ Services │       │  Atlas   │
+└──────┬──────┘       └──────┬──────┘       └─────┬────┘       └────┬─────┘
+       │                     │                     │                 │
+       │ connect(JWT)        │                     │                 │
+       │────────────────────▶│                     │                 │
+       │                     │ verify JWT          │                 │
+       │                     │ join room:          │                 │
+       │                     │ "route:{routeId}"   │                 │
+       │  connected ✓        │                     │                 │
+       │◀────────────────────│                     │                 │
+       │                     │                     │                 │
+       │ emit('gps:update',  │                     │                 │
+       │  {lat, lng, speed,  │                     │                 │
+       │   heading, ts})     │                     │                 │
+       │────────────────────▶│                     │                 │
+       │                     │ GpsService          │                 │
+       │                     │ .processLocation()  │                 │
+       │                     │────────────────────▶│                 │
+       │                     │                     │  bulkWrite      │
+       │                     │                     │  (batch c/30s)  │
+       │                     │                     │────────────────▶│
+       │                     │                     │                 │
+       │                     │                     │ checkProximity  │
+       │                     │                     │ (geofencing)    │
+       │                     │                     │────────────────▶│
+       │                     │                     │ users in radius │
+       │                     │                     │◀────────────────│
+       │                     │                     │                 │
+       │                     │                     │ FCM.send()      │
+       │                     │                     │ (push a         │
+       │                     │                     │  ciudadanos)    │
+       │                     │                     │                 │
+       │                     │ broadcast to room   │                 │
+       │                     │ "zone:{zoneId}"     │                 │
+       │                     │◀────────────────────│                 │
+       │                     │                     │                 │
+       │                     │ emit('gps:position',│                 │
+       │                     │  {vehicleId, lat,   │                 │
+       │                     │   lng, eta})        │                 │
+       │                     │─────────────────────┼──▶ Ciudadanos  │
+       │                     │                     │    Dashboard    │
+```
+
+### Optimizaciones del Flujo GPS
+- **Batching**: Acumular puntos GPS en memoria y persistir cada 30 segundos
+- **Throttling**: Aceptar máximo 1 punto por segundo por operador
+- **Compresión**: Eliminar puntos redundantes (algoritmo Douglas-Peucker)
+- **Buffer circular**: Mantener últimos 100 puntos en memoria para consultas rápidas
+
+---
+
+## 10. Flujo de Notificaciones Push
+
+```
+┌───────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐
+│  Trigger  │      │ Backend  │      │ Firebase │      │ Ciudadano│
+│  (Evento) │      │  Service │      │   FCM    │      │ (Mobile) │
+└─────┬─────┘      └─────┬────┘      └─────┬────┘      └─────┬────┘
+      │                   │                  │                 │
+      │ Camión en radio   │                  │                 │
+      │──────────────────▶│                  │                 │
+      │                   │                  │                 │
+      │                   │ Query: usuarios  │                 │
+      │                   │ en radio 500m    │                 │
+      │                   │ con notifs ON    │                 │
+      │                   │                  │                 │
+      │                   │ admin.messaging  │                 │
+      │                   │ .sendEachForMulticast() │          │
+      │                   │─────────────────▶│                 │
+      │                   │                  │  Push Notif     │
+      │                   │                  │────────────────▶│
+      │                   │                  │                 │
+      │                   │ Guardar en       │                 │ 🔔
+      │                   │ Notification     │                 │ "El camión está
+      │                   │ collection       │                 │  a 5 min"
+```
+
+### Tipos de Notificación Push
+
+| Tipo | Trigger | Destinatarios | Prioridad FCM |
+|------|---------|--------------|---------------|
+| Proximidad | Camión en radio | Ciudadanos de zona | HIGH |
+| Retraso | Desvío > 20 min | Ciudadanos de zona | NORMAL |
+| Incidencia | Estado cambia | Ciudadano reportero | NORMAL |
+| Cambio horario | Admin modifica | Ciudadanos de zona | HIGH |
+| General | Admin envía | Todos o por zona | NORMAL |
+
+---
+
+## 11. Flujo de Incidencias Ciudadanas
+
+```
+CIUDADANO                    BACKEND                      ADMIN
+    │                           │                           │
+    │ 1. Selecciona tipo        │                           │
+    │ 2. Escribe descripción    │                           │
+    │ 3. Toma foto              │                           │
+    │ 4. Confirma ubicación     │                           │
+    │                           │                           │
+    │ POST /api/v1/incidents    │                           │
+    │ (multipart/form-data)     │                           │
+    │──────────────────────────▶│                           │
+    │                           │ • Upload imagen →         │
+    │                           │   Cloudinary              │
+    │                           │ • Genera código: INC-0042 │
+    │                           │ • Detecta zona por        │
+    │                           │   geolocalización         │
+    │                           │ • Asigna prioridad auto   │
+    │                           │ • Persiste en MongoDB     │
+    │                           │                           │
+    │  201 {code: "INC-0042"}   │                           │
+    │◀──────────────────────────│                           │
+    │                           │ Socket.IO emit            │
+    │                           │ "incident:new"            │
+    │                           │──────────────────────────▶│
+    │                           │                           │ 🔔 Nueva
+    │                           │                           │    incidencia
+    │                           │                           │
+    │                           │   PATCH /:id/status       │
+    │                           │   {status: "in_progress"} │
+    │                           │◀──────────────────────────│
+    │                           │                           │
+    │  Push: "Tu reporte        │ FCM push al ciudadano     │
+    │   INC-0042 está siendo    │                           │
+    │   atendido"               │                           │
+    │◀──────────────────────────│                           │
+```
+
+### Flujo Offline (Sin conexión)
+1. Incidencia se guarda en SQLite/AsyncStorage local
+2. Se marca con `syncStatus: 'pending'`
+3. Al recuperar conexión, `useOfflineSync` detecta pendientes
+4. Sincroniza automáticamente con el backend
+5. Actualiza estado local a `syncStatus: 'synced'`
+
+---
+
+## 12. Arquitectura Socket.IO
+
+### Estructura del Servidor
+
+```
+Socket.IO Server
+│
+├── Middleware
+│   ├── socketAuth.ts          # Valida JWT en handshake
+│   └── socketLogger.ts        # Log de conexiones
+│
+├── Namespaces
+│   ├── / (default)            # Notificaciones generales
+│   ├── /tracking              # GPS tiempo real
+│   └── /incidents             # Incidencias en vivo
+│
+├── Rooms (dinámicas)
+│   ├── zone:{zoneId}          # Usuarios suscritos a zona
+│   ├── route:{routeId}        # Seguimiento de ruta específica
+│   ├── role:admin             # Todos los admins
+│   └── user:{userId}          # Canal personal
+│
+└── Eventos
+    ├── Client → Server
+    │   ├── gps:update          # Operador envía coordenadas
+    │   ├── gps:start           # Inicia tracking
+    │   ├── gps:stop            # Detiene tracking
+    │   ├── zone:subscribe      # Ciudadano se suscribe a zona
+    │   └── zone:unsubscribe    # Ciudadano se desuscribe
+    │
+    └── Server → Client
+        ├── gps:position        # Posición actualizada del camión
+        ├── gps:eta             # Tiempo estimado de llegada
+        ├── route:started       # Ruta inició ejecución
+        ├── route:completed     # Ruta completada
+        ├── route:delayed       # Retraso detectado
+        ├── incident:new        # Nueva incidencia (admin)
+        ├── incident:updated    # Estado de incidencia cambió
+        └── notification:push   # Notificación in-app
+```
+
+### Escalabilidad Socket.IO
+- **Adapter**: Usar `@socket.io/redis-adapter` si se escala a múltiples instancias
+- **Sticky Sessions**: Necesario con múltiples workers
+- **Heartbeat**: Configurar `pingInterval: 25000`, `pingTimeout: 20000`
+- **Reconexión**: Cliente con `reconnectionAttempts: 10`, backoff exponencial
