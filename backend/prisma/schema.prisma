@@ -1,0 +1,328 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  OPERATOR
+  CITIZEN
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_ROUTE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum VehicleType {
+  COMPACTOR
+  OPEN_TRUCK
+  MINI_TRUCK
+}
+
+enum WasteCategory {
+  ORGANIC
+  RECYCLABLE
+  NON_RECYCLABLE
+  HAZARDOUS
+}
+
+enum RouteStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum ExecutionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DELAYED
+}
+
+enum IncidentType {
+  WASTE_ACCUMULATION
+  DAMAGED_CONTAINER
+  MISSED_COLLECTION
+  OTHER
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+// ─── Módulo 1: Usuarios y Zonas ───────────────────────────────────────────────
+
+model User {
+  id String @id @default(cuid())
+
+  email     String @unique
+  password  String
+  dni       String @unique
+  firstName String
+  lastName  String
+  phone     String?
+  address   String?
+  district  String?
+
+  role       Role    @default(CITIZEN)
+  isActive   Boolean @default(false)
+  isVerified Boolean @default(false)
+
+  // RF-01: Verificación de correo
+  emailVerificationToken  String?   @unique
+  emailVerificationExpiry DateTime?
+
+  // RF-02: Recuperación de contraseña
+  passwordResetToken  String?   @unique
+  passwordResetExpiry DateTime?
+
+  // RF-02: Control de intentos fallidos
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+
+  // RF-04: Zona asignada
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens    RefreshToken[]
+  assignedRoutes   Route[]         @relation("OperatorRoutes")
+  routeExecutions  RouteExecution[]
+  incidents        Incident[]
+  createdZones     Zone[]          @relation("AdminZones")
+  createdRoutes    Route[]         @relation("AdminRoutes")
+
+  @@index([email])
+  @@index([dni])
+  @@index([zoneId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── Módulo 1: Zonas de Recolección ──────────────────────────────────────────
+
+model Zone {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  district    String
+  color       String  @default("#22c55e")
+  isActive    Boolean @default(true)
+
+  // GeoJSON Polygon almacenado como JSON
+  geometry Json
+
+  createdById String
+  createdBy   User   @relation("AdminZones", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  User[]
+  routes Route[]
+
+  @@index([district])
+  @@map("zones")
+}
+
+// ─── Módulo 2: Residuos ───────────────────────────────────────────────────────
+
+model WasteType {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  category    WasteCategory
+  description String?
+  colorCode   String
+  examples    String[]
+  instructions String?
+  isActive    Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  routeWasteTypes RouteWasteType[]
+
+  @@map("waste_types")
+}
+
+// ─── Módulo 3: Vehículos ──────────────────────────────────────────────────────
+
+model Vehicle {
+  id       String        @id @default(cuid())
+  plate    String        @unique
+  type     VehicleType
+  brand    String?
+  model    String?
+  year     Int?
+  capacity Float?
+  status   VehicleStatus @default(AVAILABLE)
+  isActive Boolean       @default(true)
+
+  currentLat Float?
+  currentLng Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  routes          Route[]
+  routeExecutions RouteExecution[]
+
+  @@map("vehicles")
+}
+
+// ─── Módulo 3: Rutas ─────────────────────────────────────────────────────────
+
+model Route {
+  id     String      @id @default(cuid())
+  name   String
+  status RouteStatus @default(DRAFT)
+
+  zoneId String
+  zone   Zone   @relation(fields: [zoneId], references: [id])
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  operatorId String?
+  operator   User?   @relation("OperatorRoutes", fields: [operatorId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("AdminRoutes", fields: [createdById], references: [id])
+
+  // Horario
+  dayOfWeek         Int[]
+  startTime         String?
+  estimatedDuration Int?
+
+  // GeoJSON LineString de la trayectoria
+  pathGeometry Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  waypoints       Waypoint[]
+  routeWasteTypes RouteWasteType[]
+  executions      RouteExecution[]
+
+  @@index([zoneId])
+  @@index([operatorId])
+  @@map("routes")
+}
+
+model Waypoint {
+  id          String  @id @default(cuid())
+  routeId     String
+  route       Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  order       Int
+  name        String?
+  description String?
+  lat         Float
+  lng         Float
+  estimatedTime String?
+
+  @@index([routeId])
+  @@map("waypoints")
+}
+
+model RouteWasteType {
+  routeId     String
+  route       Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  wasteTypeId String
+  wasteType   WasteType @relation(fields: [wasteTypeId], references: [id])
+
+  @@id([routeId, wasteTypeId])
+  @@map("route_waste_types")
+}
+
+// ─── Módulo 3: Ejecución de Rutas y GPS ──────────────────────────────────────
+
+model RouteExecution {
+  id        String          @id @default(cuid())
+  routeId   String
+  route     Route           @relation(fields: [routeId], references: [id])
+  operatorId String
+  operator   User           @relation(fields: [operatorId], references: [id])
+  vehicleId  String
+  vehicle    Vehicle        @relation(fields: [vehicleId], references: [id])
+  date       DateTime
+  startedAt  DateTime?
+  endedAt    DateTime?
+  status     ExecutionStatus @default(IN_PROGRESS)
+  delayMinutes Int?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gpsTracks GpsTrack[]
+
+  @@index([routeId])
+  @@index([date])
+  @@map("route_executions")
+}
+
+model GpsTrack {
+  id               String         @id @default(cuid())
+  routeExecutionId String
+  routeExecution   RouteExecution @relation(fields: [routeExecutionId], references: [id], onDelete: Cascade)
+  lat              Float
+  lng              Float
+  speed            Float?
+  heading          Float?
+  accuracy         Float?
+  timestamp        DateTime       @default(now())
+
+  @@index([routeExecutionId, timestamp])
+  @@map("gps_tracks")
+}
+
+// ─── Módulo 4: Incidencias Ciudadanas ─────────────────────────────────────────
+
+model Incident {
+  id          String         @id @default(cuid())
+  type        IncidentType
+  description String
+  status      IncidentStatus @default(OPEN)
+  imageUrl    String?
+  lat         Float?
+  lng         Float?
+  address     String?
+
+  citizenId String
+  citizen   User   @relation(fields: [citizenId], references: [id])
+
+  trackingCode String @unique @default(cuid())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([citizenId])
+  @@index([status])
+  @@map("incidents")
+}
