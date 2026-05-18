@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -7,13 +8,19 @@ import { env } from './config/env'
 import { prisma } from './config/prisma'
 import routes from './routes'
 import { errorHandler } from './middleware/errorHandler'
+import { setupSocketServer } from './socket'
 
 const app = express()
 
 // ─── Seguridad ────────────────────────────────────────────────────────────────
 app.use(helmet())
+
+const allowedOrigins = env.frontendUrl.split(',').map((u) => u.trim()).filter(Boolean)
 app.use(cors({
-  origin: env.frontendUrl,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error(`CORS: origen no permitido → ${origin}`))
+  },
   credentials: true,
 }))
 
@@ -51,14 +58,19 @@ app.use('/api/v1', routes)
 // ─── Error Handler ────────────────────────────────────────────────────────────
 app.use(errorHandler)
 
+// ─── HTTP Server + Socket.io ──────────────────────────────────────────────────
+const httpServer = createServer(app)
+setupSocketServer(httpServer, env.frontendUrl)
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function main() {
   try {
     await prisma.$connect()
     console.log('✅ Conectado a PostgreSQL')
 
-    app.listen(env.port, () => {
+    httpServer.listen(env.port, () => {
       console.log(`🚀 Backend corriendo en http://localhost:${env.port}`)
+      console.log(`   WebSocket (Socket.io) activo`)
       console.log(`   Ambiente: ${env.nodeEnv}`)
       console.log(`   Frontend: ${env.frontendUrl}`)
     })

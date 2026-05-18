@@ -34,6 +34,18 @@ export function getSavedUser(): AuthUser | null {
   }
 }
 
+export function updateSavedUser(updates: Partial<AuthUser>) {
+  if (typeof window === 'undefined') return
+  const raw = localStorage.getItem(USER_KEY)
+  if (!raw) return
+  try {
+    const user = JSON.parse(raw) as AuthUser
+    localStorage.setItem(USER_KEY, JSON.stringify({ ...user, ...updates }))
+  } catch {
+    // ignorar
+  }
+}
+
 export function clearSession() {
   localStorage.removeItem(ACCESS_KEY)
   localStorage.removeItem(REFRESH_KEY)
@@ -41,13 +53,6 @@ export function clearSession() {
   document.cookie = `${ACCESS_KEY}=; path=/; max-age=0; SameSite=Lax`
 }
 
-export function getDashboardPath(role: string): string {
-  switch (role) {
-    case 'ADMIN':
-      return '/dashboard/admin'
-    case 'OPERATOR':
-      return '/dashboard/operator'
-    default:
-      return '/dashboard'
-  }
+export function getDashboardPath(_role: string): string {
+  return '/dashboard'
 }

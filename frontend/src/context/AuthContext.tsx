@@ -10,6 +10,7 @@ import {
   getRefreshToken,
   getAccessToken,
   getDashboardPath,
+  updateSavedUser,
 } from '@/lib/auth'
 import type { AuthUser, ApiResponse } from '@/types'
 
@@ -26,6 +27,7 @@ interface AuthContextValue {
   accessToken: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  updateZone: (zoneId: string | null) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -54,6 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.accessToken)
     router.push(getDashboardPath(data.user.role))
   }, [router])
+
+  const updateZone = useCallback((zoneId: string | null) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, zoneId }
+      updateSavedUser({ zoneId })
+      return updated
+    })
+  }, [])
 
   const logout = useCallback(async () => {
     const refreshToken = getRefreshToken()
@@ -106,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accessToken,
         login,
         logout,
+        updateZone,
       }}
     >
       {children}

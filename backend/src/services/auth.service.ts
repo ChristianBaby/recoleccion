@@ -100,6 +100,7 @@ export async function loginUser(input: LoginInput) {
       role: true,
       firstName: true,
       lastName: true,
+      zoneId: true,
       isActive: true,
       isVerified: true,
       lockedUntil: true,
@@ -180,6 +181,7 @@ export async function loginUser(input: LoginInput) {
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+      zoneId: user.zoneId,
     },
   }
 }

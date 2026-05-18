@@ -1,16 +1,20 @@
 import { Router } from 'express'
 import authRoutes from './auth.routes'
+import zoneRoutes from './zone.routes'
+import vehicleRoutes from './vehicle.routes'
+import routeRoutes from './route.routes'
+import wasteRoutes from './waste.routes'
+import incidentRoutes from './incident.routes'
+import reportRoutes from './report.routes'
 
 const router = Router()
 
 router.use('/auth', authRoutes)
-
-// Aquí se agregarán las demás rutas conforme se implementen los RF restantes:
-// router.use('/zones', zonesRoutes)        // RF-03, RF-04
-// router.use('/waste-types', wasteRoutes)  // RF-05, RF-06
-// router.use('/routes', routesRoutes)      // RF-07, RF-09
-// router.use('/tracking', trackingRoutes)  // RF-08
-// router.use('/incidents', incidentsRoutes)// RF-11
-// router.use('/reports', reportsRoutes)    // RF-14, RF-15, RF-16
+router.use('/zones', zoneRoutes)        // RF-03, RF-04
+router.use('/vehicles', vehicleRoutes)  // prerequisito RF-09
+router.use('/routes', routeRoutes)      // RF-07, RF-09
+router.use('/waste-types', wasteRoutes) // RF-05, RF-06
+router.use('/incidents', incidentRoutes)// RF-11
+router.use('/reports', reportRoutes)    // RF-14, RF-15, RF-16
 
 export default router
