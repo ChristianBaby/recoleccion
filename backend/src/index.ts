@@ -12,6 +12,9 @@ import { setupSocketServer } from './socket'
 
 const app = express()
 
+// Necesario para que express-rate-limit funcione correctamente detrás de proxies (Railway, Heroku, etc.)
+app.set('trust proxy', 1)
+
 // ─── Seguridad ────────────────────────────────────────────────────────────────
 app.use(helmet())
 
