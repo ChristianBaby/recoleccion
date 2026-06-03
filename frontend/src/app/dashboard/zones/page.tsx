@@ -257,20 +257,30 @@ export default function ZonesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col"
+            style={{ height: 'min(90vh, 640px)' }}>
+
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <h2 className="font-semibold text-slate-900">
                 {editZone ? 'Editar zona' : 'Nueva zona de recolección'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-              <div className="px-6 py-5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+            {/* Two-column body */}
+            <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
+
+              {/* Left: form fields */}
+              <div className="w-72 shrink-0 flex flex-col border-r border-slate-200 overflow-y-auto">
+                <div className="px-5 py-5 space-y-4 flex-1">
+
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Nombre *</label>
                     <input
@@ -279,82 +289,97 @@ export default function ZonesPage() {
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       required
                       placeholder="Ej: Zona Centro Histórico"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
+
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Distrito *</label>
                     <select
                       value={form.district}
                       onChange={(e) => setForm({ ...form, district: e.target.value })}
                       required
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                     >
                       <option value="">Seleccionar...</option>
                       {DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
-                  <textarea
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    rows={2}
-                    placeholder="Descripción opcional..."
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-2">Color</label>
-                  <div className="flex gap-2">
-                    {COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setForm({ ...form, color: c })}
-                        className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${
-                          form.color === c ? 'border-slate-600 scale-110' : 'border-transparent'
-                        }`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Área geográfica *{' '}
-                    <span className="font-normal text-slate-400">(haz clic en el mapa para dibujar)</span>
-                  </label>
-                  <div className="h-64">
-                    <LeafletPolygonEditor
-                      vertices={form.vertices}
-                      onChange={(v) => setForm({ ...form, vertices: v })}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      rows={3}
+                      placeholder="Descripción opcional..."
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-2">Color</label>
+                    <div className="flex flex-wrap gap-2">
+                      {COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setForm({ ...form, color: c })}
+                          className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${
+                            form.color === c ? 'border-slate-700 scale-110' : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1">
+                    <p className="font-medium text-slate-700">Instrucciones del mapa</p>
+                    <p>• Haz clic para agregar puntos al polígono</p>
+                    <p>• Mínimo 3 puntos para crear la zona</p>
+                    <p>• El último punto cierra el polígono</p>
+                    {form.vertices.length > 0 && (
+                      <p className="text-emerald-600 font-medium">
+                        ✓ {form.vertices.length} punto(s) dibujados
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer inside left column */}
+                <div className="px-5 py-4 border-t border-slate-200 flex flex-col gap-2 shrink-0">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-emerald-600
+                      rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {saving && <Loader2 size={14} className="animate-spin" />}
+                    {editZone ? 'Guardar cambios' : 'Crear zona'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="w-full px-4 py-2 text-sm font-medium text-slate-600
+                      border border-slate-300 rounded-lg hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {saving && <Loader2 size={14} className="animate-spin" />}
-                  {editZone ? 'Guardar cambios' : 'Crear zona'}
-                </button>
+              {/* Right: map editor */}
+              <div className="flex-1 relative">
+                <LeafletPolygonEditor
+                  vertices={form.vertices}
+                  onChange={(v) => setForm({ ...form, vertices: v })}
+                />
               </div>
+
             </form>
           </div>
         </div>
