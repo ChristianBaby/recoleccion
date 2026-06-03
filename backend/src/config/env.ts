@@ -21,12 +21,6 @@ export const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
 
-  smtp: {
-    host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT ?? '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER ?? '',
-    pass: process.env.SMTP_PASS ?? '',
-    from: process.env.EMAIL_FROM ?? 'EcoRutas Cusco <noreply@ecorutas.pe>',
-  },
+  resendApiKey: process.env.RESEND_API_KEY ?? '',
+  emailFrom: process.env.EMAIL_FROM ?? 'EcoRutas Cusco <onboarding@resend.dev>',
 }

@@ -1,55 +1,39 @@
-import nodemailer from 'nodemailer'
 import { env } from '../config/env'
 
-const smtpReady = !!(env.smtp.user && env.smtp.pass)
-
-function createTransport() {
-  if (!smtpReady) {
-    return nodemailer.createTransport({ jsonTransport: true })
-  }
-  return nodemailer.createTransport({
-    host: env.smtp.host,
-    port: env.smtp.port,
-    secure: env.smtp.secure,
-    auth: { user: env.smtp.user, pass: env.smtp.pass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  })
-}
-
-const transport = createTransport()
-
 async function sendMail(to: string, subject: string, html: string) {
-  const info = await transport.sendMail({ from: env.smtp.from, to, subject, html })
-
-  if (!smtpReady) {
-    const parsed = JSON.parse((info as unknown as { message: string }).message)
-    console.log('\n📧 EMAIL (modo consola — configura SMTP_PASS para envío real):')
-    console.log(`   Para: ${parsed.to[0].address}`)
-    console.log(`   Asunto: ${parsed.subject}`)
-    const linkMatch = (parsed.html as string).match(/href="([^"]+)"/)
+  if (!env.resendApiKey) {
+    console.log('\n📧 EMAIL (modo consola — configura RESEND_API_KEY para envío real):')
+    console.log(`   Para: ${to}`)
+    console.log(`   Asunto: ${subject}`)
+    const linkMatch = html.match(/href="([^"]+)"/)
     if (linkMatch) console.log(`   ✅ Link: ${linkMatch[1]}`)
     console.log('')
+    return
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: env.emailFrom, to: [to], subject, html }),
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(`Resend error ${res.status}: ${(body as { message?: string }).message ?? res.statusText}`)
   }
 }
 
 export async function sendVerificationEmail(to: string, firstName: string, token: string) {
   const link = `${env.frontendUrl}/verify-email?token=${token}`
-  await sendMail(
-    to,
-    'Confirma tu cuenta — EcoRutas Cusco',
-    verificationTemplate(firstName, link),
-  )
+  await sendMail(to, 'Confirma tu cuenta — EcoRutas Cusco', verificationTemplate(firstName, link))
 }
 
 export async function sendPasswordResetEmail(to: string, firstName: string, token: string) {
   const link = `${env.frontendUrl}/reset-password?token=${token}`
-  await sendMail(
-    to,
-    'Recupera tu contraseña — EcoRutas Cusco',
-    resetPasswordTemplate(firstName, link),
-  )
+  await sendMail(to, 'Recupera tu contraseña — EcoRutas Cusco', resetPasswordTemplate(firstName, link))
 }
 
 // ─── Templates HTML ───────────────────────────────────────────────────────────
