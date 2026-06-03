@@ -17,6 +17,7 @@ import {
   CalendarDays,
   BarChart2,
   BookOpen,
+  Users,
 } from 'lucide-react'
 
 interface NavItem {
@@ -80,6 +81,12 @@ const navItems: NavItem[] = [
     label: 'Horarios',
     icon: <CalendarDays size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
+  },
+  {
+    href: '/dashboard/users',
+    label: 'Usuarios',
+    icon: <Users size={18} />,
+    roles: ['ADMIN'],
   },
   {
     href: '/dashboard/reports',

@@ -45,6 +45,32 @@ export async function sendPasswordResetEmail(to: string, firstName: string, toke
   await sendMail(to, 'Recupera tu contraseña — EcoRutas Cusco', resetPasswordTemplate(firstName, link))
 }
 
+export async function sendZoneAssignedEmail(
+  to: string,
+  firstName: string,
+  zoneName: string,
+  district: string,
+) {
+  await sendMail(
+    to,
+    'Tu zona de recolección fue asignada — EcoRutas Cusco',
+    baseTemplate(`
+      <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">¡Tu zona fue asignada! 🗺️</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
+        Hola <strong>${firstName}</strong>, el administrador asignó tu cuenta a la zona de recolección:
+      </p>
+      <div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #bbf7d0;">
+        <p style="margin:0 0 4px;font-size:13px;color:#64748b;">Zona</p>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#16a34a;">${zoneName}</p>
+        <p style="margin:8px 0 0;font-size:13px;color:#64748b;">Distrito: <strong>${district}</strong></p>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
+        Ahora recibirás notificaciones y horarios específicos para tu zona.
+      </p>
+    `),
+  )
+}
+
 export async function sendIncidentStatusEmail(
   to: string,
   firstName: string,
