@@ -16,6 +16,7 @@ const router = Router()
 // RF-01
 router.post('/register', validate(registerSchema), ctrl.register)
 router.post('/verify-email', validate(verifyEmailSchema), ctrl.verifyEmail)
+router.post('/resend-verification', validate(forgotPasswordSchema), ctrl.resendVerification)
 
 // RF-02
 router.post('/login', validate(loginSchema), ctrl.login)

@@ -50,6 +50,15 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function resendVerification(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.resendVerificationEmail(req.body.email)
+    ok(res, null, result.message)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.forgotPassword(req.body.email)

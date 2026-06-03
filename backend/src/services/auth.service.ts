@@ -46,7 +46,11 @@ export async function registerUser(input: RegisterInput) {
     select: { id: true, email: true, firstName: true, lastName: true },
   })
 
-  await sendVerificationEmail(user.email, user.firstName, verificationToken)
+  try {
+    await sendVerificationEmail(user.email, user.firstName, verificationToken)
+  } catch (emailErr) {
+    console.error('Error enviando email de verificación:', emailErr)
+  }
 
   return { message: 'Registro exitoso. Revisa tu correo para confirmar tu cuenta.' }
 }
@@ -234,6 +238,37 @@ export async function logoutUser(refreshToken: string) {
   await prisma.refreshToken.deleteMany({ where: { token: refreshToken } })
 }
 
+// ─── RF-01: Reenviar email de verificación ───────────────────────────────────
+
+export async function resendVerificationEmail(email: string) {
+  const genericMessage = 'Si el correo está registrado y pendiente de verificación, recibirás un nuevo enlace.'
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, firstName: true, isVerified: true, isActive: true },
+  })
+
+  if (!user || user.isVerified) {
+    return { message: genericMessage }
+  }
+
+  const verificationToken = generateSecureToken()
+  const verificationExpiry = addHours(new Date(), VERIFICATION_EXPIRY_HOURS)
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerificationToken: verificationToken, emailVerificationExpiry: verificationExpiry },
+  })
+
+  try {
+    await sendVerificationEmail(email, user.firstName, verificationToken)
+  } catch (emailErr) {
+    console.error('Error reenviando email de verificación:', emailErr)
+  }
+
+  return { message: genericMessage }
+}
+
 // ─── RF-02: Olvidé mi contraseña ─────────────────────────────────────────────
 
 export async function forgotPassword(email: string) {
@@ -257,7 +292,11 @@ export async function forgotPassword(email: string) {
     data: { passwordResetToken: resetToken, passwordResetExpiry: resetExpiry },
   })
 
-  await sendPasswordResetEmail(email, user.firstName, resetToken)
+  try {
+    await sendPasswordResetEmail(email, user.firstName, resetToken)
+  } catch (emailErr) {
+    console.error('Error enviando email de recuperación:', emailErr)
+  }
 
   return { message: genericMessage }
 }
