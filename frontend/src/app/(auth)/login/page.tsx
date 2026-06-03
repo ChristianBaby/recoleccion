@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogIn, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
-import { ApiError } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 
 const schema = z.object({
   email: z.string().email('Correo electrónico inválido'),
@@ -20,6 +20,8 @@ type FormData = z.infer<typeof schema>
 export default function LoginPage() {
   const { login } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
 
   const {
     register,
@@ -28,14 +30,32 @@ export default function LoginPage() {
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   async function onSubmit(data: FormData) {
+    setUnverifiedEmail(null)
     try {
       await login(data.email, data.password)
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(err.message)
+        if (err.message.toLowerCase().includes('verificar')) {
+          setUnverifiedEmail(data.email)
+        }
       } else {
         toast.error('Error al iniciar sesión. Intenta nuevamente.')
       }
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!unverifiedEmail) return
+    setResending(true)
+    try {
+      await api.post('/auth/resend-verification', { email: unverifiedEmail })
+      toast.success('Correo de verificación reenviado. Revisa tu bandeja de entrada.')
+      setUnverifiedEmail(null)
+    } catch {
+      toast.error('No se pudo reenviar el correo. Intenta más tarde.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -110,6 +130,29 @@ export default function LoginPage() {
             <p className="text-xs text-red-600">{errors.password.message}</p>
           )}
         </div>
+
+        {unverifiedEmail && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-medium mb-2">Cuenta pendiente de verificación</p>
+            <p className="text-amber-700 mb-3">
+              Tu cuenta aún no ha sido verificada. ¿No recibiste el correo?
+            </p>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-700
+                disabled:bg-amber-400 text-white text-xs font-semibold rounded-md transition-colors"
+            >
+              {resending ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Mail size={13} />
+              )}
+              {resending ? 'Enviando...' : 'Reenviar correo de verificación'}
+            </button>
+          </div>
+        )}
 
         <button
           type="submit"
