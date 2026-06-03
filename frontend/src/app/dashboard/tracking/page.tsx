@@ -9,6 +9,7 @@ import type { ApiResponse, Route, Zone } from '@/types'
 import type { TruckPosition } from '@/components/LeafletTrackingMap'
 import { Radio, Square, Navigation, Wifi, WifiOff, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
+import ZoneGuard from '@/components/ZoneGuard'
 
 const LeafletTrackingMap = dynamic(() => import('@/components/LeafletTrackingMap'), { ssr: false })
 
@@ -94,17 +95,27 @@ export default function TrackingPage() {
     }
   }, [accessToken])
 
+  // Auto-subscribe citizens and operators to their assigned zone
+  useEffect(() => {
+    if (!user?.zoneId && (user?.role === 'CITIZEN' || user?.role === 'OPERATOR')) return
+    if (user?.role === 'CITIZEN' && user.zoneId && !selectedZoneId) {
+      setSelectedZoneId(user.zoneId)
+    }
+  }, [user?.zoneId, user?.role, selectedZoneId])
+
   // Zone subscription for citizens
   useEffect(() => {
     const socket = socketRef.current
-    if (!socket || !isConnected || user?.role !== 'CITIZEN') return
+    if (!socket || !isConnected) return
+    if (user?.role !== 'CITIZEN') return
 
-    if (selectedZoneId) {
-      socket.emit('tracking:subscribe', { zoneId: selectedZoneId })
+    const zoneToSubscribe = user.zoneId ?? selectedZoneId
+    if (zoneToSubscribe) {
+      socket.emit('tracking:subscribe', { zoneId: zoneToSubscribe })
     } else {
       socket.emit('tracking:all')
     }
-  }, [selectedZoneId, isConnected, user?.role])
+  }, [selectedZoneId, isConnected, user?.role, user?.zoneId])
 
   const startTracking = useCallback(() => {
     const socket = socketRef.current
@@ -149,6 +160,7 @@ export default function TrackingPage() {
   }, [])
 
   return (
+    <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
@@ -360,5 +372,6 @@ export default function TrackingPage() {
         </div>
       </div>
     </div>
+    </ZoneGuard>
   )
 }

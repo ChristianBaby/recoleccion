@@ -4,11 +4,12 @@ import { ok, created } from '../utils/response'
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
-    const status = req.query['status'] as string | undefined
+    const status  = req.query['status']  as string | undefined
+    const zoneId  = req.query['zoneId']  as string | undefined
     const incidents = await incidentService.listIncidents(
       req.user!.id,
       req.user!.role,
-      { status },
+      { status, zoneId },
     )
     ok(res, incidents)
   } catch (err) {

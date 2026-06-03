@@ -79,7 +79,27 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 
 export async function me(req: Request, res: Response, next: NextFunction) {
   try {
-    ok(res, req.user)
+    const profile = await authService.getProfile(req.user!.id)
+    ok(res, profile)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function updateProfile(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.updateProfile(req.user!.id, req.body)
+    ok(res, result, 'Perfil actualizado correctamente')
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function changePassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { currentPassword, newPassword } = req.body
+    const result = await authService.changePassword(req.user!.id, currentPassword, newPassword)
+    ok(res, null, result.message)
   } catch (err) {
     next(err)
   }

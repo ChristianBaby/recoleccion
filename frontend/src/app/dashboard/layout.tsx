@@ -18,6 +18,7 @@ import {
   BarChart2,
   BookOpen,
   Users,
+  UserCircle,
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,6 +33,12 @@ const navItems: NavItem[] = [
     href: '/dashboard',
     label: 'Inicio',
     icon: <LayoutDashboard size={18} />,
+    roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
+  },
+  {
+    href: '/dashboard/profile',
+    label: 'Mi Perfil',
+    icon: <UserCircle size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
   },
   {

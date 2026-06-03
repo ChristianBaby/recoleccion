@@ -25,7 +25,9 @@ router.post('/logout', ctrl.logout)
 router.post('/forgot-password', validate(forgotPasswordSchema), ctrl.forgotPassword)
 router.post('/reset-password', validate(resetPasswordSchema), ctrl.resetPassword)
 
-// Ruta protegida: obtener usuario actual
+// Rutas protegidas de perfil
 router.get('/me', requireAuth, ctrl.me)
+router.patch('/me/profile', requireAuth, ctrl.updateProfile)
+router.patch('/me/password', requireAuth, ctrl.changePassword)
 
 export default router

@@ -11,6 +11,59 @@ const LOCK_DURATION_MINUTES = 15
 const VERIFICATION_EXPIRY_HOURS = 24
 const RESET_EXPIRY_HOURS = 1
 
+// ─── Perfil propio ───────────────────────────────────────────────────────────
+
+export async function getProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true, email: true, firstName: true, lastName: true,
+      dni: true, phone: true, address: true, district: true,
+      role: true, isActive: true, isVerified: true, zoneId: true,
+      zone: { select: { id: true, name: true, district: true, color: true } },
+    },
+  })
+  if (!user) throw { status: 404, message: 'Usuario no encontrado' }
+  return user
+}
+
+export async function updateProfile(
+  userId: string,
+  data: { firstName: string; lastName: string; phone?: string; address: string },
+) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone || null,
+      address: data.address,
+    },
+    select: {
+      id: true, email: true, firstName: true, lastName: true,
+      phone: true, address: true, district: true, role: true,
+      zoneId: true,
+      zone: { select: { id: true, name: true, district: true, color: true } },
+    },
+  })
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true } })
+  if (!user) throw { status: 404, message: 'Usuario no encontrado' }
+
+  const valid = await bcrypt.compare(currentPassword, user.password)
+  if (!valid) throw { status: 401, message: 'La contraseña actual es incorrecta' }
+
+  const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS)
+  await prisma.user.update({ where: { id: userId }, data: { password: hashed } })
+  return { message: 'Contraseña actualizada correctamente' }
+}
+
 // ─── RF-01: Registro ──────────────────────────────────────────────────────────
 
 export async function registerUser(input: RegisterInput) {

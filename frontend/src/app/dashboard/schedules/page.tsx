@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import type { ApiResponse, Zone, Route } from '@/types'
 import { Clock, Calendar, Map } from 'lucide-react'
 import RouteMapModal from '@/components/RouteMapModal'
+import ZoneGuard from '@/components/ZoneGuard'
 
 const DAYS = [
   { label: 'Lunes', short: 'L', value: 1 },
@@ -27,13 +28,14 @@ function formatDuration(minutes: number | null): string {
 
 export default function SchedulesPage() {
   const { user, accessToken } = useAuth()
+  const isRestricted = user?.role === 'CITIZEN' || user?.role === 'OPERATOR'
   const [zones, setZones] = useState<Zone[]>([])
   const [selectedZoneId, setSelectedZoneId] = useState('')
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(false)
   const [mapRouteId, setMapRouteId] = useState<string | null>(null)
 
-  // Load all active zones
+  // Load zones and auto-select for restricted roles
   useEffect(() => {
     if (!accessToken) return
     api
@@ -41,13 +43,12 @@ export default function SchedulesPage() {
       .then((r) => {
         const active = (r.data ?? []).filter((z) => z.isActive)
         setZones(active)
-        // Auto-select first zone for citizens (or just let them pick)
-        if (active.length > 0 && user?.role === 'CITIZEN') {
-          setSelectedZoneId(active[0].id)
+        if (isRestricted && user?.zoneId) {
+          setSelectedZoneId(user.zoneId)
         }
       })
       .catch(() => {})
-  }, [accessToken, user?.role])
+  }, [accessToken, isRestricted, user?.zoneId])
 
   // Load routes for selected zone
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function SchedulesPage() {
   const selectedZone = zones.find((z) => z.id === selectedZoneId)
 
   return (
+    <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
     <div className="p-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
@@ -83,35 +85,44 @@ export default function SchedulesPage() {
         </p>
       </div>
 
-      {/* Zone selector */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex items-center gap-4">
-        <div className="flex items-center gap-2 text-slate-600 shrink-0">
-          <Calendar size={16} />
-          <span className="text-sm font-medium">Zona:</span>
-        </div>
-        <select
-          value={selectedZoneId}
-          onChange={(e) => setSelectedZoneId(e.target.value)}
-          className="flex-1 max-w-xs border border-slate-200 rounded-lg px-3 py-2 text-sm
-            focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="">Selecciona una zona</option>
-          {zones.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.name} — {z.district}
-            </option>
-          ))}
-        </select>
-        {selectedZone && (
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: selectedZone.color }}
-            />
-            <span className="text-sm text-slate-600">{selectedZone.district}</span>
+      {/* Zone selector — only for admins */}
+      {!isRestricted ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex items-center gap-4">
+          <div className="flex items-center gap-2 text-slate-600 shrink-0">
+            <Calendar size={16} />
+            <span className="text-sm font-medium">Zona:</span>
           </div>
-        )}
-      </div>
+          <select
+            value={selectedZoneId}
+            onChange={(e) => setSelectedZoneId(e.target.value)}
+            className="flex-1 max-w-xs border border-slate-200 rounded-lg px-3 py-2 text-sm
+              focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="">Selecciona una zona</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name} — {z.district}
+              </option>
+            ))}
+          </select>
+          {selectedZone && (
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedZone.color }} />
+              <span className="text-sm text-slate-600">{selectedZone.district}</span>
+            </div>
+          )}
+        </div>
+      ) : selectedZone && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex items-center gap-3">
+          <Calendar size={16} className="text-emerald-600" />
+          <span className="text-sm font-medium text-slate-700">Tu zona:</span>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedZone.color }} />
+            <span className="text-sm font-semibold text-slate-800">{selectedZone.name}</span>
+            <span className="text-xs text-slate-500">— {selectedZone.district}</span>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {!selectedZoneId && (
@@ -212,6 +223,7 @@ export default function SchedulesPage() {
         />
       )}
     </div>
+    </ZoneGuard>
   )
 }
 

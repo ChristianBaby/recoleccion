@@ -7,13 +7,30 @@ import { sendIncidentStatusEmail } from './email.service'
 export async function listIncidents(
   userId: string,
   role: string,
-  filters?: { status?: string },
+  filters?: { status?: string; zoneId?: string },
 ) {
   const isAdmin = role === 'ADMIN'
+
+  if (isAdmin) {
+    return prisma.incident.findMany({
+      where: {
+        ...(filters?.status && { status: filters.status as any }),
+        ...(filters?.zoneId && { citizen: { zoneId: filters.zoneId } }),
+      },
+      include: {
+        citizen: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  // Ciudadano/Operador: ver todas las incidencias de su zona
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { zoneId: true } })
+  if (!me?.zoneId) return [] // Sin zona = sin incidencias
+
   return prisma.incident.findMany({
     where: {
-      // Ciudadanos solo ven sus propias incidencias
-      ...(!isAdmin && { citizenId: userId }),
+      citizen: { zoneId: me.zoneId },
       ...(filters?.status && { status: filters.status as any }),
     },
     include: {
@@ -46,6 +63,11 @@ export async function getIncident(id: string, userId: string, role: string) {
 // ─── RF-11: Crear incidencia ──────────────────────────────────────────────────
 
 export async function createIncident(input: CreateIncidentInput, citizenId: string) {
+  const citizen = await prisma.user.findUnique({ where: { id: citizenId }, select: { zoneId: true } })
+  if (!citizen?.zoneId) {
+    throw { status: 403, message: 'Debes tener una zona asignada para reportar incidencias' }
+  }
+
   return prisma.incident.create({
     data: {
       type: input.type,

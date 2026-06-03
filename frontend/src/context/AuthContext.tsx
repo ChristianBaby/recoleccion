@@ -28,6 +28,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   updateZone: (zoneId: string | null) => void
+  updateUser: (updates: Partial<AuthUser>) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -62,6 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!prev) return prev
       const updated = { ...prev, zoneId }
       updateSavedUser({ zoneId })
+      return updated
+    })
+  }, [])
+
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, ...updates }
+      updateSavedUser(updates)
       return updated
     })
   }, [])
@@ -118,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         updateZone,
+        updateUser,
       }}
     >
       {children}

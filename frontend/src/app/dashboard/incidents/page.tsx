@@ -7,8 +7,10 @@ import type { ApiResponse, Incident, IncidentStatus } from '@/types'
 import { toast } from 'sonner'
 import {
   Plus, X, Loader2, AlertTriangle, MapPin, Copy, Check,
-  ChevronDown, ImagePlus, Trash2,
+  ChevronDown, ImagePlus, Trash2, Filter,
 } from 'lucide-react'
+import ZoneGuard from '@/components/ZoneGuard'
+import type { Zone } from '@/types'
 
 const INCIDENT_TYPE_LABELS: Record<string, string> = {
   WASTE_ACCUMULATION: 'Acumulación de residuos',
@@ -51,6 +53,8 @@ export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<IncidentStatus | 'ALL'>('ALL')
+  const [filterZoneId, setFilterZoneId] = useState('')
+  const [zones, setZones] = useState<Zone[]>([])
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<FormState>(defaultForm)
   const [saving, setSaving] = useState(false)
@@ -64,15 +68,24 @@ export default function IncidentsPage() {
   const fetchIncidents = useCallback(async () => {
     if (!accessToken) return
     try {
-      const params = filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''
-      const res = await api.get<ApiResponse<Incident[]>>(`/incidents${params}`, accessToken)
+      const params = new URLSearchParams()
+      if (filterStatus !== 'ALL') params.set('status', filterStatus)
+      if (isAdmin && filterZoneId) params.set('zoneId', filterZoneId)
+      const res = await api.get<ApiResponse<Incident[]>>(`/incidents?${params}`, accessToken)
       setIncidents(res.data ?? [])
     } catch {
       toast.error('Error al cargar las incidencias')
     } finally {
       setLoading(false)
     }
-  }, [accessToken, filterStatus])
+  }, [accessToken, filterStatus, filterZoneId, isAdmin])
+
+  useEffect(() => {
+    if (!accessToken || !isAdmin) return
+    api.get<ApiResponse<Zone[]>>('/zones', accessToken)
+      .then((r) => setZones((r.data ?? []).filter((z) => z.isActive)))
+      .catch(() => {})
+  }, [accessToken, isAdmin])
 
   useEffect(() => { fetchIncidents() }, [fetchIncidents])
 
@@ -206,6 +219,7 @@ export default function IncidentsPage() {
       : incidents.filter((i) => i.status === filterStatus)
 
   return (
+    <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
@@ -217,17 +231,44 @@ export default function IncidentsPage() {
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
               RF-11 · {incidents.length} incidencia(s)
-              {!isAdmin && ' · Solo tus reportes'}
+              {!isAdmin && ' · Incidencias de tu zona'}
             </p>
           </div>
-          <button
-            onClick={() => { setForm(defaultForm); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg
-              text-sm font-medium hover:bg-amber-600 transition-colors"
-          >
-            <Plus size={16} /> Reportar incidencia
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => { setForm(defaultForm); setShowModal(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg
+                text-sm font-medium hover:bg-amber-600 transition-colors"
+            >
+              <Plus size={16} /> Reportar incidencia
+            </button>
+          )}
         </div>
+
+        {/* Admin zone filter */}
+        {isAdmin && (
+          <div className="flex items-center gap-3 mb-3">
+            <Filter size={14} className="text-slate-400" />
+            <select
+              value={filterZoneId}
+              onChange={(e) => setFilterZoneId(e.target.value)}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm
+                focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+            >
+              <option value="">Todas las zonas</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>{z.name} — {z.district}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => { setForm(defaultForm); setShowModal(true) }}
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg
+                text-sm font-medium hover:bg-amber-600 transition-colors"
+            >
+              <Plus size={16} /> Registrar incidencia
+            </button>
+          </div>
+        )}
 
         {/* Status filter */}
         <div className="flex gap-1.5">
@@ -527,5 +568,6 @@ export default function IncidentsPage() {
         </div>
       )}
     </div>
+    </ZoneGuard>
   )
 }
