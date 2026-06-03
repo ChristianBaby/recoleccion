@@ -22,7 +22,8 @@ const allowedOrigins = env.frontendUrl.split(',').map((u) => u.trim()).filter(Bo
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
-    callback(new Error(`CORS: origen no permitido → ${origin}`))
+    console.warn(`[CORS] Origen bloqueado: ${origin} | Permitidos: ${allowedOrigins.join(', ')}`)
+    callback(null, false)
   },
   credentials: true,
 }))
