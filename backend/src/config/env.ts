@@ -21,6 +21,6 @@ export const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
 
-  resendApiKey: process.env.RESEND_API_KEY ?? '',
-  emailFrom: process.env.EMAIL_FROM ?? 'EcoRutas Cusco <onboarding@resend.dev>',
+  brevoApiKey: process.env.BREVO_API_KEY ?? '',
+  emailFrom: process.env.EMAIL_FROM ?? 'EcoRutas Cusco <noreply@ecorutas.pe>',
 }

@@ -1,8 +1,8 @@
 import { env } from '../config/env'
 
 async function sendMail(to: string, subject: string, html: string) {
-  if (!env.resendApiKey) {
-    console.log('\n📧 EMAIL (modo consola — configura RESEND_API_KEY para envío real):')
+  if (!env.brevoApiKey) {
+    console.log('\n📧 EMAIL (modo consola — configura BREVO_API_KEY para envío real):')
     console.log(`   Para: ${to}`)
     console.log(`   Asunto: ${subject}`)
     const linkMatch = html.match(/href="([^"]+)"/)
@@ -11,18 +11,27 @@ async function sendMail(to: string, subject: string, html: string) {
     return
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const senderMatch = env.emailFrom.match(/^(.+?)\s*<(.+)>$/)
+  const senderName = senderMatch ? senderMatch[1].trim() : 'EcoRutas Cusco'
+  const senderEmail = senderMatch ? senderMatch[2].trim() : env.emailFrom
+
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.resendApiKey}`,
+      'api-key': env.brevoApiKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: env.emailFrom, to: [to], subject, html }),
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
   })
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(`Resend error ${res.status}: ${(body as { message?: string }).message ?? res.statusText}`)
+    throw new Error(`Brevo error ${res.status}: ${(body as { message?: string }).message ?? res.statusText}`)
   }
 }
 
