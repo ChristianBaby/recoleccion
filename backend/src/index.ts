@@ -21,7 +21,10 @@ app.use(helmet())
 const allowedOrigins = env.frontendUrl.split(',').map((u) => u.trim()).filter(Boolean)
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    // Permitir cualquier subdominio de vercel.app (previews de Vercel)
+    if (origin.endsWith('.vercel.app')) return callback(null, true)
     console.warn(`[CORS] Origen bloqueado: ${origin} | Permitidos: ${allowedOrigins.join(', ')}`)
     callback(null, false)
   },
