@@ -67,7 +67,7 @@ interface ParticipationData {
   }[]
 }
 
-// ─── CSV helper ───────────────────────────────────────────────────────────────
+// ─── Export helpers ───────────────────────────────────────────────────────────
 
 function downloadCSV(filename: string, rows: string[][], headers: string[]) {
   const lines = [headers, ...rows].map((r) =>
@@ -80,6 +80,65 @@ function downloadCSV(filename: string, rows: string[][], headers: string[]) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function downloadExcel(filename: string, rows: string[][], headers: string[]) {
+  // Excel-compatible XML Spreadsheet (opens natively in Excel/LibreOffice)
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const toRow = (cells: string[], isHeader = false) =>
+    `<Row>${cells.map((c) => `<Cell${isHeader ? ' ss:StyleID="h"' : ''}><Data ss:Type="String">${esc(c)}</Data></Cell>`).join('')}</Row>`
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="h"><Font ss:Bold="1"/><Interior ss:Color="#16a34a" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>
+  </Styles>
+  <Worksheet ss:Name="Reporte">
+    <Table>
+      ${toRow(headers, true)}
+      ${rows.map((r) => toRow(r)).join('\n      ')}
+    </Table>
+  </Worksheet>
+</Workbook>`
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function printPDF(title: string, headers: string[], rows: string[][]) {
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const thCells = headers.map((h) => `<th>${esc(h)}</th>`).join('')
+  const trRows = rows.map(
+    (r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`,
+  ).join('')
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; padding: 24px; }
+    h2 { color: #16a34a; margin-bottom: 4px; }
+    p.sub { color: #64748b; font-size: 11px; margin-bottom: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th { background: #16a34a; color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; }
+    td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    @media print { body { padding: 0; } }
+  </style></head><body>
+  <h2>EcoRutas Cusco — ${esc(title)}</h2>
+  <p class="sub">Generado el ${new Date().toLocaleDateString('es-PE', { dateStyle: 'long' })}</p>
+  <table><thead><tr>${thCells}</tr></thead><tbody>${trRows}</tbody></table>
+  <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}<\/script>
+  </body></html>`
+
+  const w = window.open('', '_blank', 'width=900,height=700')
+  w?.document.write(html)
+  w?.document.close()
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -113,6 +172,39 @@ function StatCard({
         <p className="text-xl font-bold text-slate-900">{value}</p>
         {sub && <p className="text-xs text-slate-400">{sub}</p>}
       </div>
+    </div>
+  )
+}
+
+function ExportButtons({
+  onCSV, onExcel, onPDF,
+}: { onCSV: () => void; onExcel: () => void; onPDF: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={onCSV}
+        className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-600
+          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-emerald-300"
+        title="Exportar CSV"
+      >
+        <Download size={12} /> CSV
+      </button>
+      <button
+        onClick={onExcel}
+        className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-600
+          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-emerald-300"
+        title="Exportar Excel"
+      >
+        <Download size={12} /> Excel
+      </button>
+      <button
+        onClick={onPDF}
+        className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-600
+          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-red-300"
+        title="Exportar PDF"
+      >
+        <Download size={12} /> PDF
+      </button>
     </div>
   )
 }
@@ -167,13 +259,14 @@ function WasteTab({
 
   const chartData = data.map((z) => ({ name: z.zoneName, Ejecuciones: z.executions, fill: z.color }))
 
-  function handleExport() {
+  function getExportData() {
+    const headers = ['Zona', 'Distrito', 'Ejecuciones', 'Tipo Residuo', 'Categoría', 'Conteo']
     const rows = data.flatMap((z) =>
       z.categories.length > 0
         ? z.categories.map((c) => [z.zoneName, z.district, String(z.executions), c.name, c.category, String(c.count)])
         : [[z.zoneName, z.district, String(z.executions), '—', '—', '0']],
     )
-    downloadCSV('residuos_por_zona.csv', rows, ['Zona', 'Distrito', 'Ejecuciones', 'Tipo Residuo', 'Categoría', 'Conteo'])
+    return { headers, rows }
   }
 
   return (
@@ -195,13 +288,11 @@ function WasteTab({
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-slate-700">Ejecuciones de rutas por zona</h3>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600
-              border border-slate-200 rounded-lg px-3 py-1.5 transition-colors hover:border-emerald-300"
-          >
-            <Download size={13} /> Exportar CSV
-          </button>
+          <ExportButtons
+            onCSV={() => { const { headers, rows } = getExportData(); downloadCSV('residuos_por_zona.csv', rows, headers) }}
+            onExcel={() => { const { headers, rows } = getExportData(); downloadExcel('residuos_por_zona.xls', rows, headers) }}
+            onPDF={() => { const { headers, rows } = getExportData(); printPDF('Residuos por zona', headers, rows) }}
+          />
         </div>
         {loading ? (
           <div className="h-64 flex items-center justify-center">
@@ -325,23 +416,16 @@ function ComplianceTab({
     fill: r.zone?.color ?? '#64748b',
   }))
 
-  function handleExport() {
+  function getExportDataCompliance() {
+    const headers = ['Ruta', 'Zona', 'Operador', 'Vehículo', 'Total Ejec.', 'Completadas', 'Con Retraso', 'Canceladas', 'Cumplimiento %', 'Retraso Prom. (min)']
     const rows = data.map((r) => [
-      r.routeName,
-      r.zone?.name ?? '',
+      r.routeName, r.zone?.name ?? '',
       r.operator ? `${r.operator.firstName} ${r.operator.lastName}` : '',
       r.vehicle?.plate ?? '',
-      String(r.totalExecutions),
-      String(r.completed),
-      String(r.delayed),
-      String(r.cancelled),
-      `${r.compliancePct}%`,
-      String(r.avgDelayMinutes),
+      String(r.totalExecutions), String(r.completed), String(r.delayed),
+      String(r.cancelled), `${r.compliancePct}%`, String(r.avgDelayMinutes),
     ])
-    downloadCSV('cumplimiento_rutas.csv', rows, [
-      'Ruta', 'Zona', 'Operador', 'Vehículo',
-      'Total Ejec.', 'Completadas', 'Con Retraso', 'Canceladas', 'Cumplimiento %', 'Retraso Promedio (min)',
-    ])
+    return { headers, rows }
   }
 
   function complianceColor(pct: number) {
@@ -363,13 +447,11 @@ function ComplianceTab({
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-slate-700">% Cumplimiento por ruta</h3>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600
-              border border-slate-200 rounded-lg px-3 py-1.5 transition-colors hover:border-emerald-300"
-          >
-            <Download size={13} /> Exportar CSV
-          </button>
+          <ExportButtons
+            onCSV={() => { const { headers, rows } = getExportDataCompliance(); downloadCSV('cumplimiento_rutas.csv', rows, headers) }}
+            onExcel={() => { const { headers, rows } = getExportDataCompliance(); downloadExcel('cumplimiento_rutas.xls', rows, headers) }}
+            onPDF={() => { const { headers, rows } = getExportDataCompliance(); printPDF('Cumplimiento de rutas', headers, rows) }}
+          />
         </div>
         {loading ? (
           <div className="h-64 flex items-center justify-center">
@@ -506,18 +588,13 @@ function ParticipationTab({
     fill: z.color,
   }))
 
-  function handleExport() {
+  function getExportDataParticipation() {
+    const headers = ['Zona', 'Distrito', 'Ciudadanos', 'Total Incidencias', 'Abiertas', 'Resueltas']
     const rows = byZone.map((z) => [
-      z.zoneName,
-      z.district,
-      String(z.citizenCount),
-      String(z.incidents.total),
-      String(z.incidents.open),
-      String(z.incidents.resolved),
+      z.zoneName, z.district, String(z.citizenCount),
+      String(z.incidents.total), String(z.incidents.open), String(z.incidents.resolved),
     ])
-    downloadCSV('participacion_ciudadana.csv', rows, [
-      'Zona', 'Distrito', 'Ciudadanos', 'Total Incidencias', 'Abiertas', 'Resueltas',
-    ])
+    return { headers, rows }
   }
 
   return (
@@ -557,13 +634,11 @@ function ParticipationTab({
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Ciudadanos e incidencias por zona</h3>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600
-                  border border-slate-200 rounded-lg px-3 py-1.5 transition-colors hover:border-emerald-300"
-              >
-                <Download size={13} /> Exportar CSV
-              </button>
+              <ExportButtons
+                onCSV={() => { const { headers, rows } = getExportDataParticipation(); downloadCSV('participacion_ciudadana.csv', rows, headers) }}
+                onExcel={() => { const { headers, rows } = getExportDataParticipation(); downloadExcel('participacion_ciudadana.xls', rows, headers) }}
+                onPDF={() => { const { headers, rows } = getExportDataParticipation(); printPDF('Participación ciudadana', headers, rows) }}
+              />
             </div>
             {byZone.length === 0 ? (
               <EmptyChart message="Sin datos de participación" />

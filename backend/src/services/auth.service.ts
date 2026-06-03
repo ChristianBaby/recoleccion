@@ -30,6 +30,12 @@ export async function registerUser(input: RegisterInput) {
   const verificationToken = generateSecureToken()
   const verificationExpiry = addHours(new Date(), VERIFICATION_EXPIRY_HOURS)
 
+  // RF-04: buscar zona activa cuyo distrito coincida
+  const matchingZone = await prisma.zone.findFirst({
+    where: { district: { equals: input.district, mode: 'insensitive' }, isActive: true },
+    select: { id: true },
+  })
+
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -42,6 +48,7 @@ export async function registerUser(input: RegisterInput) {
       district: input.district,
       emailVerificationToken: verificationToken,
       emailVerificationExpiry: verificationExpiry,
+      ...(matchingZone && { zoneId: matchingZone.id }),
     },
     select: { id: true, email: true, firstName: true, lastName: true },
   })

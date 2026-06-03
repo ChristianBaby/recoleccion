@@ -31,7 +31,7 @@ app.use(cors({
 // Rate limiting global
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   message: { success: false, message: 'Demasiadas solicitudes. Intenta en 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,7 +40,7 @@ app.use(rateLimit({
 // Rate limiting estricto para auth
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 50,
   message: { success: false, message: 'Demasiados intentos de autenticación. Intenta en 15 minutos.' },
 })
 app.use('/api/v1/auth/login', authLimiter)

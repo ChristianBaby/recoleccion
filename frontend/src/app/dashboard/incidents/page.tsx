@@ -7,7 +7,7 @@ import type { ApiResponse, Incident, IncidentStatus } from '@/types'
 import { toast } from 'sonner'
 import {
   Plus, X, Loader2, AlertTriangle, MapPin, Copy, Check,
-  ChevronDown,
+  ChevronDown, ImagePlus, Trash2,
 } from 'lucide-react'
 
 const INCIDENT_TYPE_LABELS: Record<string, string> = {
@@ -54,6 +54,9 @@ export default function IncidentsPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<FormState>(defaultForm)
   const [saving, setSaving] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [geoLoading, setGeoLoading] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -96,17 +99,63 @@ export default function IncidentsPage() {
     )
   }
 
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 5 MB')
+      return
+    }
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImagePreview(null)
+    setForm((f) => ({ ...f, imageUrl: '' }))
+  }
+
+  async function uploadToImgBB(file: File): Promise<string> {
+    const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY
+    if (!apiKey) throw new Error('IMGBB_API_KEY no configurada')
+    const formData = new FormData()
+    formData.append('image', file)
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: 'POST',
+      body: formData,
+    })
+    const json = await res.json()
+    if (!json.success) throw new Error('Error al subir imagen')
+    return json.data.url as string
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!accessToken) return
 
     setSaving(true)
     try {
+      let imageUrl = form.imageUrl.trim()
+
+      if (imageFile) {
+        setUploadingImage(true)
+        try {
+          imageUrl = await uploadToImgBB(imageFile)
+        } catch {
+          toast.error('No se pudo subir la imagen. El reporte se enviará sin foto.')
+          imageUrl = ''
+        } finally {
+          setUploadingImage(false)
+        }
+      }
+
       const payload: Record<string, unknown> = {
         type: form.type,
         description: form.description,
       }
-      if (form.imageUrl.trim()) payload.imageUrl = form.imageUrl.trim()
+      if (imageUrl) payload.imageUrl = imageUrl
       if (form.address.trim()) payload.address = form.address.trim()
       if (form.lat && form.lng) {
         payload.lat = parseFloat(form.lat)
@@ -121,6 +170,7 @@ export default function IncidentsPage() {
       )
       setShowModal(false)
       setForm(defaultForm)
+      removeImage()
       fetchIncidents()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Error al reportar')
@@ -223,6 +273,7 @@ export default function IncidentsPage() {
                   {isAdmin && (
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ciudadano</th>
                   )}
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Foto</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ubicación</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Fecha</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
@@ -269,6 +320,22 @@ export default function IncidentsPage() {
                             : '—'}
                         </td>
                       )}
+
+                      {/* Image */}
+                      <td className="px-4 py-3">
+                        {inc.imageUrl ? (
+                          <a href={inc.imageUrl} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={inc.imageUrl}
+                              alt="foto"
+                              className="w-10 h-10 object-cover rounded-lg border border-slate-200 hover:scale-150 transition-transform"
+                            />
+                          </a>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
 
                       {/* Location */}
                       <td className="px-4 py-3">
@@ -334,7 +401,7 @@ export default function IncidentsPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <h2 className="font-semibold text-slate-900">Reportar incidencia</h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+              <button onClick={() => { setShowModal(false); removeImage() }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
                 <X size={18} />
               </button>
             </div>
@@ -402,18 +469,39 @@ export default function IncidentsPage() {
                   )}
                 </div>
 
-                {/* Image URL */}
+                {/* Image upload */}
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    URL de foto <span className="font-normal text-slate-400">(opcional)</span>
+                    Foto <span className="font-normal text-slate-400">(opcional, máx. 5 MB)</span>
                   </label>
-                  <input
-                    type="url"
-                    value={form.imageUrl}
-                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
+                  {imagePreview ? (
+                    <div className="relative rounded-lg overflow-hidden border border-slate-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imagePreview} alt="Preview" className="w-full max-h-40 object-cover" />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-lg text-red-500
+                          hover:bg-white transition-colors"
+                        title="Eliminar imagen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 w-full h-24
+                      border-2 border-dashed border-slate-300 rounded-lg cursor-pointer
+                      hover:border-amber-400 hover:bg-amber-50 transition-colors">
+                      <ImagePlus size={20} className="text-slate-400" />
+                      <span className="text-xs text-slate-400">Click para adjuntar foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 
@@ -427,11 +515,11 @@ export default function IncidentsPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                   className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {saving && <Loader2 size={14} className="animate-spin" />}
-                  Enviar reporte
+                  {(saving || uploadingImage) && <Loader2 size={14} className="animate-spin" />}
+                  {uploadingImage ? 'Subiendo imagen...' : saving ? 'Enviando...' : 'Enviar reporte'}
                 </button>
               </div>
             </form>

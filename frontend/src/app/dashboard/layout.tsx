@@ -16,6 +16,7 @@ import {
   Activity,
   CalendarDays,
   BarChart2,
+  BookOpen,
 } from 'lucide-react'
 
 interface NavItem {
@@ -54,6 +55,12 @@ const navItems: NavItem[] = [
     href: '/dashboard/waste-types',
     label: 'Residuos',
     icon: <Recycle size={18} />,
+    roles: ['ADMIN', 'CITIZEN', 'OPERATOR'],
+  },
+  {
+    href: '/dashboard/learn',
+    label: 'Aprende a segregar',
+    icon: <BookOpen size={18} />,
     roles: ['ADMIN', 'CITIZEN', 'OPERATOR'],
   },
   {

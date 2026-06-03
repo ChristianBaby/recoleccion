@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma'
 import type { CreateIncidentInput, UpdateIncidentStatusInput } from '../validators/incident.validator'
+import { sendIncidentStatusEmail } from './email.service'
 
 // ─── RF-11: Listar incidencias ────────────────────────────────────────────────
 
@@ -75,13 +76,30 @@ export async function updateIncidentStatus(
   id: string,
   input: UpdateIncidentStatusInput,
 ) {
-  const incident = await prisma.incident.findUnique({ where: { id } })
+  const incident = await prisma.incident.findUnique({
+    where: { id },
+    include: { citizen: { select: { email: true, firstName: true } } },
+  })
   if (!incident) throw { status: 404, message: 'Incidencia no encontrada' }
 
-  return prisma.incident.update({
+  const updated = await prisma.incident.update({
     where: { id },
     data: { status: input.status },
   })
+
+  // Notificar al ciudadano por email
+  try {
+    await sendIncidentStatusEmail(
+      incident.citizen.email,
+      incident.citizen.firstName,
+      incident.trackingCode,
+      input.status,
+    )
+  } catch (err) {
+    console.error('Error enviando notificación de incidencia:', err)
+  }
+
+  return updated
 }
 
 // ─── RF-11: Buscar por código de seguimiento ──────────────────────────────────

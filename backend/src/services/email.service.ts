@@ -45,6 +45,26 @@ export async function sendPasswordResetEmail(to: string, firstName: string, toke
   await sendMail(to, 'Recupera tu contraseña — EcoRutas Cusco', resetPasswordTemplate(firstName, link))
 }
 
+export async function sendIncidentStatusEmail(
+  to: string,
+  firstName: string,
+  trackingCode: string,
+  newStatus: string,
+) {
+  const STATUS_LABELS: Record<string, string> = {
+    OPEN: 'Abierta',
+    IN_REVIEW: 'En revisión',
+    RESOLVED: 'Resuelta',
+    CLOSED: 'Cerrada',
+  }
+  const label = STATUS_LABELS[newStatus] ?? newStatus
+  await sendMail(
+    to,
+    `Tu incidencia fue actualizada — EcoRutas Cusco`,
+    incidentStatusTemplate(firstName, trackingCode, label),
+  )
+}
+
 // ─── Templates HTML ───────────────────────────────────────────────────────────
 
 function baseTemplate(content: string): string {
@@ -106,6 +126,24 @@ function verificationTemplate(firstName: string, link: string): string {
       Este enlace expira en <strong>24 horas</strong>.<br>
       Si el botón no funciona, copia este link:<br>
       <a href="${link}" style="color:#16a34a;word-break:break-all;">${link}</a>
+    </p>
+  `)
+}
+
+function incidentStatusTemplate(firstName: string, trackingCode: string, statusLabel: string): string {
+  return baseTemplate(`
+    <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">Actualización de tu incidencia 📋</h2>
+    <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
+      Hola <strong>${firstName}</strong>, el estado de tu reporte ha sido actualizado.
+    </p>
+    <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #e2e8f0;">
+      <p style="margin:0 0 8px;font-size:13px;color:#64748b;">Código de seguimiento</p>
+      <p style="margin:0;font-size:18px;font-weight:700;color:#1e293b;font-family:monospace;">${trackingCode}</p>
+      <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Nuevo estado</p>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:600;color:#16a34a;">${statusLabel}</p>
+    </div>
+    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
+      Puedes seguir el estado de tu reporte en la sección de Incidencias del sistema.
     </p>
   `)
 }
