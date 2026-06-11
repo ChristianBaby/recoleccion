@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoRutas Cusco — Mapping & Planning</title>
+  <style>
+    :root {
+      --green:   #16a34a;
+      --green-bg:#dcfce7;
+      --yellow:  #ca8a04;
+      --yellow-bg:#fef9c3;
+      --red:     #dc2626;
+      --red-bg:  #fee2e2;
+      --gray:    #6b7280;
+      --gray-bg: #f3f4f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%);
+      color: white;
+      padding: 2.5rem 2rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -.5px; }
+    header p  { margin-top: .4rem; opacity: .85; font-size: .95rem; }
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      background: white;
+      padding: .9rem 2rem;
+      border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    .dot {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-green  { background: var(--green);  }
+    .dot-yellow { background: var(--yellow); }
+    .dot-red    { background: var(--red);    }
+
+    main { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    /* ── Stats bar ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      text-align: center;
+    }
+    .stat-card .number { font-size: 2rem; font-weight: 800; }
+    .stat-card .label  { font-size: .8rem; color: var(--gray); text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem; }
+    .stat-card.green  .number { color: var(--green);  }
+    .stat-card.yellow .number { color: var(--yellow); }
+    .stat-card.red    .number { color: var(--red);    }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      background: white;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      margin-bottom: 2rem;
+    }
+    .progress-wrap h3 { font-size: .9rem; font-weight: 600; color: var(--gray); margin-bottom: .75rem; }
+    .progress-bar {
+      height: 18px;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      background: #e2e8f0;
+    }
+    .progress-seg { transition: width .4s; }
+    .progress-seg.green  { background: var(--green);  }
+    .progress-seg.yellow { background: var(--yellow); }
+    .progress-seg.red    { background: var(--red);    }
+    .progress-labels {
+      display: flex; gap: 1rem; margin-top: .5rem; font-size: .78rem; color: var(--gray);
+    }
+
+    /* ── Module sections ── */
+    .module {
+      margin-bottom: 2.5rem;
+    }
+    .module-header {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .module-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+    }
+    .module-header h2 { font-size: 1.1rem; font-weight: 700; }
+    .module-header .module-sub { font-size: .82rem; color: var(--gray); margin-top: .1rem; }
+
+    /* ── RF cards grid ── */
+    .rf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+
+    .rf-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      border-left: 4px solid;
+      position: relative;
+      transition: box-shadow .15s;
+    }
+    .rf-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+
+    .rf-card.implemented  { border-color: var(--green);  background: #f0fdf4; }
+    .rf-card.partial      { border-color: var(--yellow); background: #fefce8; }
+    .rf-card.pending      { border-color: var(--red);    background: #fff1f2; }
+
+    .rf-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .5rem;
+      margin-bottom: .5rem;
+    }
+    .rf-id {
+      font-size: .75rem;
+      font-weight: 700;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+    }
+    .implemented .rf-id  { background: var(--green-bg);  color: var(--green);  }
+    .partial     .rf-id  { background: var(--yellow-bg); color: var(--yellow); }
+    .pending     .rf-id  { background: var(--red-bg);    color: var(--red);    }
+
+    .rf-badge {
+      font-size: .72rem;
+      font-weight: 600;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .implemented .rf-badge  { background: var(--green);  color: white; }
+    .partial     .rf-badge  { background: var(--yellow); color: white; }
+    .pending     .rf-badge  { background: var(--red);    color: white; }
+
+    .rf-name { font-size: .95rem; font-weight: 700; margin-bottom: .35rem; }
+    .rf-desc { font-size: .82rem; color: #475569; margin-bottom: .65rem; }
+
+    /* ── Tags ── */
+    .rf-tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .65rem; }
+    .tag {
+      font-size: .7rem; font-weight: 600;
+      padding: .15rem .5rem;
+      border-radius: 999px;
+      background: #e0f2fe; color: #0369a1;
+    }
+    .tag.orange { background: #ffedd5; color: #c2410c; }
+    .tag.purple { background: #ede9fe; color: #6d28d9; }
+    .tag.pink   { background: #fce7f3; color: #9d174d; }
+
+    /* ── Where section ── */
+    .rf-where { font-size: .78rem; color: #64748b; }
+    .rf-where details { cursor: pointer; }
+    .rf-where summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      user-select: none;
+      font-weight: 600;
+    }
+    .rf-where summary::-webkit-details-marker { display: none; }
+    .rf-where summary::before { content: '▶'; font-size: .65rem; transition: transform .2s; }
+    .rf-where details[open] summary::before { transform: rotate(90deg); }
+    .rf-where ul {
+      margin-top: .4rem;
+      padding-left: 1.1rem;
+      list-style: disc;
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+    }
+    .rf-where code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: .75rem;
+      background: rgba(0,0,0,.06);
+      padding: .05rem .3rem;
+      border-radius: 3px;
+    }
+
+    /* ── Architecture section ── */
+    .arch-section {
+      margin-top: 3rem;
+    }
+    .arch-section h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1rem;
+    }
+    .arch-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .arch-card h3 {
+      font-size: .9rem;
+      font-weight: 700;
+      margin-bottom: .7rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .arch-card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+    }
+    .arch-card li {
+      font-size: .8rem;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .arch-card li::before { content: '→'; color: #94a3b8; }
+    .arch-card code {
+      font-family: 'Cascadia Code', monospace;
+      font-size: .77rem;
+      background: #f1f5f9;
+      padding: .08rem .35rem;
+      border-radius: 4px;
+    }
+
+    /* ── Stack table ── */
+    .stack-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .stack-table th { text-align: left; padding: .6rem .8rem; background: #f1f5f9; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+    .stack-table td { padding: .55rem .8rem; border-top: 1px solid #e2e8f0; }
+    .stack-table tr:hover td { background: #f8fafc; }
+
+    /* ── Socket events table ── */
+    .events-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .events-table th { text-align: left; padding: .55rem .8rem; background: #f1f5f9; font-size: .77rem; text-transform: uppercase; letter-spacing: .05em; }
+    .events-table td { padding: .5rem .8rem; border-top: 1px solid #e2e8f0; vertical-align: top; }
+    .events-table tr:hover td { background: #f8fafc; }
+    .events-table code { font-family: 'Cascadia Code', monospace; font-size: .77rem; background: #e0f2fe; padding: .05rem .35rem; border-radius: 3px; color: #0369a1; }
+    .dir { font-weight: 600; font-size: .72rem; padding: .15rem .45rem; border-radius: 4px; white-space: nowrap; }
+    .dir.emit { background: #dcfce7; color: #15803d; }
+    .dir.recv { background: #dbeafe; color: #1d4ed8; }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8;
+      font-size: .8rem;
+      margin-top: 3rem;
+      border-top: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 EcoRutas Cusco — Mapping &amp; Planning</h1>
+  <p>Sistema Inteligente de Gestión de Recolección de Residuos Sólidos · Desarrollo de Software I</p>
+  <p style="margin-top:.3rem;font-size:.8rem;opacity:.65;">Actualizado: 11 Jun 2026 · Rama: main · Commit: b24fd1e</p>
+</header>
+
+<nav class="legend">
+  <div class="legend-item"><span class="dot dot-green"></span>  Implementado</div>
+  <div class="legend-item"><span class="dot dot-yellow"></span> Parcialmente implementado</div>
+  <div class="legend-item"><span class="dot dot-red"></span>    Pendiente</div>
+</nav>
+
+<main>
+
+  <!-- ── STATS ── -->
+  <div class="stats">
+    <div class="stat-card green">
+      <div class="number">15</div>
+      <div class="label">Implementados</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="number">1</div>
+      <div class="label">Parcial</div>
+    </div>
+    <div class="stat-card red">
+      <div class="number">0</div>
+      <div class="label">Pendientes</div>
+    </div>
+    <div class="stat-card">
+      <div class="number" style="color:#3b82f6">16</div>
+      <div class="label">Total RFs</div>
+    </div>
+  </div>
+
+  <!-- ── PROGRESS ── -->
+  <div class="progress-wrap">
+    <h3>Progreso general del proyecto</h3>
+    <div class="progress-bar">
+      <div class="progress-seg green"  style="width:93.75%"></div>
+      <div class="progress-seg yellow" style="width:6.25%"></div>
+      <div class="progress-seg red"    style="width:0%"></div>
+    </div>
+    <div class="progress-labels">
+      <span style="color:var(--green)">■ 93.75 % completado (15 RF)</span>
+      <span style="color:var(--yellow)">■ 6.25 % parcial (1 RF — RF-12 notificación push automática)</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 1 — Gestión de Usuarios y Zonas
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#dbeafe;color:#1d4ed8">👤</div>
+      <div>
+        <h2>Módulo 1 — Gestión de Usuarios y Zonas</h2>
+        <div class="module-sub">Registro, autenticación, roles y asignación geográfica</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-01 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-01</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Registro de ciudadanos</div>
+        <div class="rf-tags">
+          <span class="tag">JWT</span><span class="tag">Email verify</span><span class="tag orange">bcrypt</span>
+        </div>
+        <div class="rf-desc">Registro con verificación de correo electrónico. Campos: nombre, DNI, email, teléfono, dirección, distrito. Bloqueo por 5 intentos fallidos (15 min). El admin también puede crear cuentas OPERATOR / ADMIN con contraseña directamente desde el panel.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>auth.controller.ts</code>, <code>auth.service.ts</code></li>
+              <li>Backend: <code>user.service.ts</code> → <code>createStaffUser()</code></li>
+              <li>Rutas: <code>POST /auth/register</code>, <code>POST /users</code></li>
+              <li>Frontend: <code>app/(auth)/register/page.tsx</code></li>
+              <li>Frontend: <code>dashboard/users/page.tsx</code> → <code>CreateUserModal</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-02 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-02</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Autenticación e inicio de sesión</div>
+        <div class="rf-tags">
+          <span class="tag">JWT</span><span class="tag orange">Roles</span><span class="tag purple">Refresh Token</span>
+        </div>
+        <div class="rf-desc">JWT (access 15 min + refresh 7 d), roles ADMIN / OPERATOR / CITIZEN, bloqueo de cuenta tras 5 intentos, recuperación de contraseña por email. Perfil editable con foto de avatar y cambio de zona. Toggle activo/inactivo de usuarios desde admin.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>auth.controller.ts</code>, <code>auth.service.ts</code></li>
+              <li>Rutas: <code>POST /auth/login</code>, <code>/refresh</code>, <code>/logout</code></li>
+              <li>Rutas: <code>POST /auth/forgot-password</code>, <code>/reset-password</code></li>
+              <li>Rutas: <code>PATCH /users/:id/toggle-active</code></li>
+              <li>Frontend: <code>app/(auth)/login/page.tsx</code></li>
+              <li>Frontend: <code>context/AuthContext.tsx</code></li>
+              <li>Frontend: <code>dashboard/profile/page.tsx</code></li>
+              <li>Frontend: <code>dashboard/users/page.tsx</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-03 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-03</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Gestión de zonas de recolección</div>
+        <div class="rf-tags">
+          <span class="tag">GeoJSON</span><span class="tag purple">Leaflet</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">CRUD de zonas con geometría GeoJSON (polígono), color personalizable, distrito, estado activo/inactivo. Editor visual con Leaflet Draw. 6 distritos del Cusco pre-cargados con polígonos reales.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>zone.controller.ts</code>, <code>zone.service.ts</code></li>
+              <li>Rutas: <code>GET/POST/PUT/PATCH /zones</code></li>
+              <li>Frontend: <code>dashboard/zones/page.tsx</code></li>
+              <li>BD: modelo <code>Zone</code> (Prisma) — campo <code>geometry: Json</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-04 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-04</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Asignación de usuarios a zonas</div>
+        <div class="rf-tags">
+          <span class="tag">Geo-detect</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">Auto-asignación por GPS (algoritmo punto-en-polígono al registrarse). El admin asigna manualmente desde el panel de usuarios, tanto a ciudadanos como a operadores. El ciudadano puede cambiar su propia zona desde perfil.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>zone.service.ts</code> → <code>detectZoneByCoordinates()</code></li>
+              <li>Rutas: <code>POST /zones/detect</code>, <code>POST /zones/assign-me</code></li>
+              <li>Rutas: <code>PATCH /users/:id/assign-zone</code></li>
+              <li>Frontend: <code>dashboard/users/page.tsx</code> — botón zona en CITIZEN y OPERATOR</li>
+              <li>Frontend: <code>components/ZoneGuard.tsx</code> — bypass para OPERATOR y ADMIN</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 3 — Rutas y Monitoreo GPS  (prioridad alta)
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#fce7f3;color:#9d174d">🗺️</div>
+      <div>
+        <h2>Módulo 3 — Rutas, Vehículos y Monitoreo GPS</h2>
+        <div class="module-sub">Planificación con editor de mapa, flota de vehículos y seguimiento en tiempo real</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-08 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-08</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Seguimiento GPS en tiempo real</div>
+        <div class="rf-tags">
+          <span class="tag pink">Socket.IO</span><span class="tag">Leaflet</span><span class="tag purple">Navigator GPS</span><span class="tag orange">Haversine</span>
+        </div>
+        <div class="rf-desc">
+          <strong>Operador:</strong> activa seguimiento desde panel de turno → <code>watchPosition</code> del navegador → eventos Socket.IO cada actualización GPS.<br><br>
+          <strong>Mapa del operador:</strong> punto azul pulsante (idle, antes de iniciar) y punto azul sólido (en ruta). Ruta planificada superpuesta en el mapa: línea discontinua antes de iniciar, sólida durante el recorrido. Waypoints visitados marcados con ✓ (radio 50 m). Botón "Mi ubicación" que hace <code>flyTo</code> a la posición actual.<br><br>
+          <strong>Verificación de inicio:</strong> si el operador está a más de 500 m del primer waypoint, se muestra modal de advertencia con distancia exacta y opción de confirmar.<br><br>
+          <strong>Admin/Ciudadano:</strong> ven todos los camiones activos en tiempo real con velocidad y última señal.
+        </div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>socket/tracking.ts</code> — salas <code>zone:{id}</code>, <code>admin_room</code>, <code>user:{id}</code></li>
+              <li>BD: modelo <code>GpsTrack</code> (lat, lng, speed, heading, accuracy)</li>
+              <li>Frontend: <code>dashboard/tracking/page.tsx</code></li>
+              <li>Componente: <code>LeafletTrackingMap.tsx</code></li>
+              <li>Tipos exportados: <code>TruckPosition</code>, <code>RouteOverlay</code>, <code>WaypointOverlay</code></li>
+              <li>Sub-componentes: <code>FitToRoute</code>, <code>MapCapturer</code></li>
+              <li>Ayudante: <code>haversineMeters()</code> — distancia GPS en metros</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-09 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-09</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Gestión de rutas (administrador)</div>
+        <div class="rf-tags">
+          <span class="tag purple">Editor de mapa</span><span class="tag">Waypoints</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">
+          <strong>Formulario:</strong> nombre, zona, vehículo, operador, días de la semana, hora de inicio, duración estimada, estado (DRAFT / ACTIVE / INACTIVE).<br><br>
+          <strong>Editor de waypoints en mapa:</strong> clic para añadir paradas, arrastrar para reposicionar, lista lateral con nombres editables y orden numérico. Cada waypoint guarda lat/lng, nombre y tiempo estimado de llegada.<br><br>
+          <strong>Panel del operador:</strong> tarjeta "ruta de hoy" filtrada por <code>dayOfWeek</code>, progreso de paradas con barra visual y lista con estados visitado/pendiente. Selector para rutas de otros días.
+        </div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>route.controller.ts</code>, <code>route.service.ts</code></li>
+              <li>Backend: <code>vehicle.controller.ts</code>, <code>vehicle.service.ts</code></li>
+              <li>Rutas: <code>GET/POST/PUT/DELETE /routes</code>, <code>GET /routes/:id</code></li>
+              <li>Rutas: <code>GET/POST/PUT/PATCH /vehicles</code></li>
+              <li>Frontend (admin): <code>dashboard/routes/page.tsx</code> — <code>WaypointMapEditorModal</code></li>
+              <li>Frontend (admin): <code>dashboard/vehicles/page.tsx</code></li>
+              <li>Componente: <code>LeafletWaypointEditor.tsx</code> — tipo <code>WaypointDraft</code></li>
+              <li>BD: modelos <code>Route</code>, <code>Waypoint</code>, <code>RouteExecution</code>, <code>Vehicle</code></li>
+              <li>Tipos vehículo: COMPACTOR · OPEN_TRUCK · MINI_TRUCK</li>
+              <li>Estados vehículo: AVAILABLE · IN_ROUTE · MAINTENANCE · INACTIVE</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-07 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-07</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Visualización de rutas de recolección</div>
+        <div class="rf-tags">
+          <span class="tag purple">Leaflet</span><span class="tag">Filtros</span>
+        </div>
+        <div class="rf-desc">Ciudadanos y operadores visualizan rutas activas con waypoints ordenados, horarios y vehículo asignado. 41 rutas pre-cargadas. Filtros por estado (Todas / Activas / Borrador / Inactivas) en panel admin.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>route.service.ts</code>, <code>route.controller.ts</code></li>
+              <li>Rutas: <code>GET /routes?zoneId=&amp;status=&amp;operatorId=</code></li>
+              <li>Rutas: <code>GET /routes/:id</code> (incluye waypoints)</li>
+              <li>Frontend: <code>dashboard/routes/page.tsx</code></li>
+              <li>Frontend: <code>dashboard/schedules/page.tsx</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 5 — Alertas  (RF-13 completo, RF-12 parcial)
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#fef9c3;color:#854d0e">🔔</div>
+      <div>
+        <h2>Módulo 5 — Sistema de Alertas</h2>
+        <div class="module-sub">Notificaciones de retraso (implementado) y cercanía del camión (infraestructura lista)</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-13 — ahora IMPLEMENTADO -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-13</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Alertas de retraso en rutas</div>
+        <div class="rf-tags">
+          <span class="tag pink">Socket.IO</span><span class="tag">Broadcast zona</span>
+        </div>
+        <div class="rf-desc">
+          El operador reporta un retraso desde su panel de turno indicando minutos y motivo (opcional). El servidor emite el evento <code>tracking:delay_reported</code> a todos los ciudadanos de la sala de la zona activa. Los ciudadanos reciben un toast de notificación inmediato. El retraso queda registrado en la ejecución de la ruta.
+        </div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>socket/tracking.ts</code> → evento <code>tracking:report_delay</code></li>
+              <li>Backend: broadcast <code>tracking:delay_reported</code> a sala <code>zone:{id}</code></li>
+              <li>Frontend: <code>dashboard/tracking/page.tsx</code> — modal "Reportar retraso"</li>
+              <li>Frontend: <code>submitDelay()</code> → <code>socket.emit('tracking:report_delay', {delayMinutes, reason})</code></li>
+              <li>Frontend: listener <code>onDelayReported</code> → <code>toast.success()</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-12 — sigue PARCIAL -->
+      <div class="rf-card partial">
+        <div class="rf-head">
+          <span class="rf-id">RF-12</span>
+          <span class="rf-badge">⚠ Parcial</span>
+        </div>
+        <div class="rf-name">Notificación de cercanía del camión</div>
+        <div class="rf-tags">
+          <span class="tag pink">Socket.IO</span><span class="tag orange">Geofence pendiente</span>
+        </div>
+        <div class="rf-desc">
+          <strong>Implementado:</strong> los ciudadanos ven en tiempo real todos los camiones activos de su zona en el mapa (posición, velocidad, última señal). La infraestructura WebSocket está completamente operativa.<br><br>
+          <strong>Pendiente:</strong> la lógica de geofence en backend (comparar posición del camión con <code>homeLat/homeLng</code> de cada ciudadano) y disparar un evento/notificación automática cuando la distancia sea menor al umbral configurable (500 m por defecto).
+        </div>
+        <div class="rf-where">
+          <details>
+            <summary>Lo que falta implementar</summary>
+            <ul>
+              <li>En <code>socket/tracking.ts</code>: al recibir <code>tracking:position</code>, calcular distancia a todos los usuarios de la zona con <code>homeLat/homeLng</code></li>
+              <li>Si distancia &lt; umbral → <code>socket.to('user:{id}').emit('tracking:truck_nearby', {...})</code></li>
+              <li>Frontend: listener <code>truck_nearby</code> → notificación toast/push persistente</li>
+              <li>Configurar umbral por usuario (campo <code>alertRadius</code> en BD)</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 4 — Incidencias y Horarios
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#fef3c7;color:#92400e">📋</div>
+      <div>
+        <h2>Módulo 4 — Incidencias y Consulta Ciudadana</h2>
+        <div class="module-sub">Reporte de problemas con foto y geolocalización, y consulta de horarios</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-11 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-11</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Reporte ciudadano de incidencias</div>
+        <div class="rf-tags">
+          <span class="tag">GPS</span><span class="tag orange">Imagen</span><span class="tag purple">Tracking code</span>
+        </div>
+        <div class="rf-desc">Los ciudadanos reportan incidencias con tipo, descripción, foto y coordenadas GPS automáticas. Código de seguimiento único por reporte. El admin gestiona estados: OPEN → IN_REVIEW → RESOLVED → CLOSED.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>incident.controller.ts</code>, <code>incident.service.ts</code></li>
+              <li>Rutas: <code>GET/POST /incidents</code>, <code>PATCH /incidents/:id/status</code></li>
+              <li>Rutas: <code>GET /incidents/track/:code</code></li>
+              <li>Frontend: <code>dashboard/incidents/page.tsx</code></li>
+              <li>BD: modelo <code>Incident</code> — tipos: WASTE_ACCUMULATION · DAMAGED_CONTAINER · MISSED_COLLECTION · OTHER</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-10 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-10</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Consulta de horarios de recolección</div>
+        <div class="rf-tags">
+          <span class="tag">Por zona</span><span class="tag">Por día</span>
+        </div>
+        <div class="rf-desc">Los ciudadanos consultan horarios de recolección por zona asignada, filtrados por día de la semana. Se muestra hora de inicio, duración estimada, vehículo asignado y tipos de residuos del día.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Frontend: <code>dashboard/schedules/page.tsx</code></li>
+              <li>Backend: <code>GET /routes?zoneId=&amp;status=ACTIVE</code></li>
+              <li>BD: campos <code>dayOfWeek[]</code>, <code>startTime</code>, <code>estimatedDuration</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 6 — Reportes y Analítica
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#ede9fe;color:#5b21b6">📊</div>
+      <div>
+        <h2>Módulo 6 — Reportes y Analítica</h2>
+        <div class="module-sub">Exportación PDF/Excel y dashboards de métricas para el administrador</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-14 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-14</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Reporte de residuos recolectados por zona</div>
+        <div class="rf-tags">
+          <span class="tag orange">PDF</span><span class="tag orange">Excel</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">Dashboard y exportación (PDF con jsPDF / Excel con ExcelJS) de residuos recolectados agrupados por zona, tipo y período. Filtros por fecha y zona. Solo ADMIN.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>report.service.ts</code> → <code>wasteByZone()</code></li>
+              <li>Rutas: <code>GET /reports/waste-by-zone</code></li>
+              <li>Frontend: <code>dashboard/reports/page.tsx</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-15 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-15</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Reporte de cumplimiento de rutas</div>
+        <div class="rf-tags">
+          <span class="tag orange">PDF</span><span class="tag orange">Excel</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">Métricas de puntualidad, retrasos y cancelaciones por ruta y operador. Porcentaje de cumplimiento, paradas omitidas y desviación promedio. Exportable. Solo ADMIN.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>report.service.ts</code> → <code>routeCompliance()</code></li>
+              <li>Rutas: <code>GET /reports/route-compliance</code></li>
+              <li>Frontend: <code>dashboard/reports/page.tsx</code></li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-16 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-16</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Reporte de participación ciudadana</div>
+        <div class="rf-tags">
+          <span class="tag orange">PDF</span><span class="tag orange">Excel</span><span class="tag orange">Admin</span>
+        </div>
+        <div class="rf-desc">Estadísticas de incidencias reportadas, usuarios activos por zona y consultas a la sección educativa (LearnVisit). Cada visita a "Aprende" se registra para este reporte. Exportable. Solo ADMIN.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>report.service.ts</code> → <code>citizenParticipation()</code></li>
+              <li>Backend: <code>pageVisit.routes.ts</code> — registra visitas educativas</li>
+              <li>Rutas: <code>GET /reports/citizen-participation</code></li>
+              <li>Frontend: <code>dashboard/reports/page.tsx</code></li>
+              <li>BD: modelo <code>LearnVisit</code> (userId, zoneId, createdAt)</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MÓDULO 2 — Gestión de Residuos (informativo/educativo)
+  ══════════════════════════════════════════════════ -->
+  <div class="module">
+    <div class="module-header">
+      <div class="module-icon" style="background:#d1fae5;color:#065f46">♻️</div>
+      <div>
+        <h2>Módulo 2 — Gestión de Residuos y Educación</h2>
+        <div class="module-sub">Catálogo de tipos de residuos y guía educativa de segregación (NTP 900.058)</div>
+      </div>
+    </div>
+    <div class="rf-grid">
+
+      <!-- RF-05 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-05</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Registro de tipos de residuos</div>
+        <div class="rf-tags">
+          <span class="tag orange">Admin</span><span class="tag">NTP 900.058</span>
+        </div>
+        <div class="rf-desc">CRUD admin de tipos de residuos con categoría, código de color NTP, ejemplos cotidianos e instrucciones de manejo. Toggle activo/inactivo. 6 tipos pre-cargados alineados con normativa peruana.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Backend: <code>waste.controller.ts</code>, <code>waste.service.ts</code></li>
+              <li>Rutas: <code>GET/POST/PUT/PATCH /waste-types</code></li>
+              <li>Frontend: <code>dashboard/waste-types/page.tsx</code></li>
+              <li>BD: modelo <code>WasteType</code> — categorías: ORGANIC · RECYCLABLE · NON_RECYCLABLE · HAZARDOUS</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <!-- RF-06 -->
+      <div class="rf-card implemented">
+        <div class="rf-head">
+          <span class="rf-id">RF-06</span>
+          <span class="rf-badge">✓ Implementado</span>
+        </div>
+        <div class="rf-name">Clasificación y catálogo educativo</div>
+        <div class="rf-tags">
+          <span class="tag">Ciudadano</span><span class="tag purple">Aprende</span><span class="tag pink">LearnVisit</span>
+        </div>
+        <div class="rf-desc">Módulo "Aprende a segregar" para ciudadanos: guías visuales por categoría, color de contenedor correcto, ejemplos cotidianos e instrucciones de manejo. Cada visita registra un <code>LearnVisit</code> para el reporte RF-16.</div>
+        <div class="rf-where">
+          <details>
+            <summary>Ver archivos</summary>
+            <ul>
+              <li>Frontend: <code>dashboard/learn/page.tsx</code></li>
+              <li>Frontend: <code>dashboard/waste-types/page.tsx</code> — vista pública</li>
+              <li>Backend: <code>GET /waste-types?category=&amp;search=</code></li>
+              <li>Backend: <code>POST /page-visits</code> — registra visita educativa</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       ARQUITECTURA TÉCNICA
+  ══════════════════════════════════════════════════ -->
+  <div class="arch-section">
+    <h2>Arquitectura Técnica</h2>
+
+    <div class="arch-grid">
+
+      <div class="arch-card">
+        <h3>🖥️ Frontend — Next.js 14+ (App Router)</h3>
+        <ul>
+          <li><code>app/(auth)/</code> — login, registro, forgot/reset, verify</li>
+          <li><code>app/dashboard/tracking/</code> — mapa GPS tiempo real</li>
+          <li><code>app/dashboard/routes/</code> — gestión rutas + editor mapa</li>
+          <li><code>app/dashboard/zones/</code> — zonas geográficas</li>
+          <li><code>app/dashboard/vehicles/</code> — flota de vehículos</li>
+          <li><code>app/dashboard/users/</code> — gestión de usuarios</li>
+          <li><code>app/dashboard/incidents/</code> — incidencias ciudadanas</li>
+          <li><code>app/dashboard/schedules/</code> — horarios de recolección</li>
+          <li><code>app/dashboard/waste-types/</code> — catálogo residuos</li>
+          <li><code>app/dashboard/learn/</code> — educación ambiental</li>
+          <li><code>app/dashboard/reports/</code> — reportes PDF/Excel</li>
+          <li><code>app/dashboard/profile/</code> — perfil editable</li>
+        </ul>
+      </div>
+
+      <div class="arch-card">
+        <h3>🧩 Componentes clave</h3>
+        <ul>
+          <li><code>LeafletTrackingMap.tsx</code> — mapa GPS en tiempo real, rutas, botón ubicación</li>
+          <li><code>LeafletWaypointEditor.tsx</code> — editor de waypoints para crear rutas</li>
+          <li><code>ZoneGuard.tsx</code> — guardia de zona (bypass ADMIN y OPERATOR)</li>
+          <li><code>context/AuthContext.tsx</code> — estado global de sesión + token</li>
+          <li><code>lib/api.ts</code> — cliente HTTP centralizado con accessToken</li>
+          <li><code>lib/socket.ts</code> — singleton Socket.IO con auth JWT</li>
+        </ul>
+      </div>
+
+      <div class="arch-card">
+        <h3>⚙️ Backend — Express 4 + TypeScript</h3>
+        <ul>
+          <li><code>controllers/</code> — auth, zone, route, vehicle, waste, incident, report, user</li>
+          <li><code>services/</code> — lógica de negocio desacoplada del controlador</li>
+          <li><code>routes/</code> — organizadas por recurso (9 módulos)</li>
+          <li><code>middleware/</code> — requireAuth, requireRole, validate, errorHandler</li>
+          <li><code>socket/tracking.ts</code> — WebSocket para GPS: start, position, stop, delay</li>
+          <li><code>email.service.ts</code> — Nodemailer + Gmail SMTP</li>
+          <li>Validación de entrada: Zod v3</li>
+        </ul>
+      </div>
+
+      <div class="arch-card">
+        <h3>🗄️ Base de Datos — PostgreSQL + Prisma</h3>
+        <ul>
+          <li>Modelo <code>User</code> — roles ADMIN · OPERATOR · CITIZEN</li>
+          <li>Modelo <code>Zone</code> — geometría GeoJSON, color, distrito</li>
+          <li>Modelo <code>Route</code> — zona, vehículo, operador, dayOfWeek, horario</li>
+          <li>Modelo <code>Waypoint</code> — orden, lat, lng, nombre, tiempo estimado</li>
+          <li>Modelo <code>RouteExecution</code> — ejecución de ruta con estado y retrasos</li>
+          <li>Modelo <code>GpsTrack</code> — posición, velocidad, heading, accuracy</li>
+          <li>Modelo <code>Vehicle</code> — placa, tipo, capacidad, estado</li>
+          <li>Modelo <code>WasteType</code> — categoría, color NTP, ejemplos</li>
+          <li>Modelo <code>Incident</code> — tipo, estado, foto, coords, código seguimiento</li>
+          <li>Modelo <code>LearnVisit</code> — trazabilidad de consultas educativas (RF-16)</li>
+          <li>Modelo <code>RefreshToken</code> — tokens de sesión persistente</li>
+        </ul>
+      </div>
+
+      <div class="arch-card">
+        <h3>📡 API REST — Endpoints</h3>
+        <ul>
+          <li><code>POST /auth/register</code> · <code>login</code> · <code>refresh</code> · <code>logout</code></li>
+          <li><code>POST /auth/forgot-password</code> · <code>reset-password</code></li>
+          <li><code>GET/POST/PUT/PATCH /zones</code> + <code>POST /zones/detect</code></li>
+          <li><code>GET/POST/PUT/DELETE /routes</code> · <code>GET /routes/:id</code></li>
+          <li><code>GET/POST/PUT/PATCH /vehicles</code></li>
+          <li><code>GET/POST/PUT/PATCH /waste-types</code></li>
+          <li><code>GET/POST /incidents</code> · <code>PATCH /incidents/:id/status</code></li>
+          <li><code>GET /reports/waste-by-zone</code> · <code>route-compliance</code> · <code>citizen-participation</code></li>
+          <li><code>GET/POST /users</code> · <code>PATCH /users/:id/assign-zone</code></li>
+          <li><code>PATCH /users/:id/toggle-active</code></li>
+          <li><code>POST /page-visits</code> — visitas educativas RF-16</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Socket.IO events table -->
+    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-top:1.5rem;">
+      <div style="padding:.8rem 1.2rem;background:#f1f5f9;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#475569;">
+        Eventos Socket.IO — Rastreo GPS
+      </div>
+      <table class="events-table">
+        <thead>
+          <tr>
+            <th>Evento</th>
+            <th>Dirección</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>tracking:start</code></td><td><span class="dir emit">Emit (operador)</span></td><td>Inicia transmisión, une al operador a su sala de zona</td></tr>
+          <tr><td><code>tracking:position</code></td><td><span class="dir emit">Emit (operador)</span></td><td>Envía lat, lng, speed al servidor cada actualización GPS</td></tr>
+          <tr><td><code>tracking:stop</code></td><td><span class="dir emit">Emit (operador)</span></td><td>Detiene transmisión, emite <code>truck_removed</code> a la zona</td></tr>
+          <tr><td><code>tracking:subscribe</code></td><td><span class="dir emit">Emit (ciudadano)</span></td><td>Suscribe al ciudadano a la sala de una zona específica</td></tr>
+          <tr><td><code>tracking:report_delay</code></td><td><span class="dir emit">Emit (operador)</span></td><td>Reporta retraso con minutos y motivo</td></tr>
+          <tr><td><code>tracking:trucks</code></td><td><span class="dir recv">Recv (todos)</span></td><td>Lista inicial de camiones activos al conectar</td></tr>
+          <tr><td><code>tracking:truck_update</code></td><td><span class="dir recv">Recv (todos)</span></td><td>Actualización de posición de un camión en tiempo real</td></tr>
+          <tr><td><code>tracking:truck_removed</code></td><td><span class="dir recv">Recv (todos)</span></td><td>Un operador finalizó su ruta — retirar del mapa</td></tr>
+          <tr><td><code>tracking:delay_reported</code></td><td><span class="dir recv">Recv (ciudadanos zona)</span></td><td>Notificación de retraso broadcast a la zona (RF-13)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Tech stack table -->
+    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-top:1rem;">
+      <div style="padding:.8rem 1.2rem;background:#f1f5f9;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#475569;">
+        Stack Tecnológico
+      </div>
+      <table class="stack-table">
+        <thead>
+          <tr>
+            <th>Capa</th>
+            <th>Tecnología</th>
+            <th>Detalle</th>
+            <th>Puerto</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Frontend</td><td>Next.js 14+ (App Router) + TypeScript</td><td>Tailwind CSS v4, Lucide React, Sonner</td><td>3000</td></tr>
+          <tr><td>Mapas</td><td>Leaflet + react-leaflet</td><td>dynamic import (SSR desactivado), GeoJSON, divIcon</td><td>—</td></tr>
+          <tr><td>Backend</td><td>Express 4 + TypeScript</td><td>Prisma ORM, Zod v3</td><td>4000</td></tr>
+          <tr><td>Base de datos</td><td>PostgreSQL 15+</td><td>Gestionada vía Prisma migrate</td><td>5432</td></tr>
+          <tr><td>Auth</td><td>JWT + bcryptjs</td><td>Access 15 min + Refresh 7 días</td><td>—</td></tr>
+          <tr><td>Tiempo real</td><td>Socket.IO</td><td>Salas: zone:{id}, admin_room, user:{id}</td><td>—</td></tr>
+          <tr><td>Email</td><td>Nodemailer + Gmail SMTP</td><td>Verificación de cuenta, reset de contraseña</td><td>—</td></tr>
+          <tr><td>Reportes</td><td>jsPDF + ExcelJS</td><td>Exportación PDF y Excel con formato</td><td>—</td></tr>
+          <tr><td>Deploy FE</td><td>Vercel</td><td>CI/CD desde rama main, preview URLs automáticas</td><td>443</td></tr>
+          <tr><td>Deploy BE</td><td>Railway</td><td>Nixpacks, <code>npm start</code>, variables de entorno</td><td>443</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       DATOS SEMILLA
+  ══════════════════════════════════════════════════ -->
+  <div class="arch-section" style="margin-top:2.5rem;">
+    <h2>Datos Semilla (seed.ts)</h2>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <h3>👥 Usuarios</h3>
+        <ul>
+          <li>1 Admin (<code>204805@unsaac.edu.pe</code>)</li>
+          <li>10 Operadores (<code>*@ecorutas.pe</code>)</li>
+          <li>Todos pre-verificados y activos</li>
+          <li>Roles: ADMIN · OPERATOR</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h3>🚛 Vehículos (15)</h3>
+        <ul>
+          <li>6 Compactores — Mercedes-Benz, Volvo, Scania</li>
+          <li>5 Open Trucks — Toyota, Isuzu, Mitsubishi</li>
+          <li>4 Mini Trucks — Kia, Hyundai</li>
+          <li>Estados: AVAILABLE · IN_ROUTE · MAINTENANCE</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h3>🗺️ Zonas (6 distritos del Cusco)</h3>
+        <ul>
+          <li>Cusco Centro · Santiago · Wanchaq</li>
+          <li>San Sebastián · San Jerónimo · Poroy</li>
+          <li>Geometría GeoJSON real por distrito</li>
+          <li>Color diferenciado por zona</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h3>🛣️ Rutas (41 rutas activas)</h3>
+        <ul>
+          <li>Cusco Centro: 9 · Santiago: 8 · Wanchaq: 8</li>
+          <li>San Sebastián: 8 · San Jerónimo: 8 · Poroy: 9</li>
+          <li>Cada ruta: waypoints GPS, horario, vehículo, operador</li>
+          <li>Múltiples días de la semana asignados</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h3>♻️ Tipos de Residuos (6)</h3>
+        <ul>
+          <li>Orgánicos — contenedor marrón</li>
+          <li>Papel y Cartón — contenedor azul</li>
+          <li>Plásticos — contenedor amarillo</li>
+          <li>Metales — contenedor plateado</li>
+          <li>Vidrio — contenedor verde</li>
+          <li>No reciclables — contenedor negro</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  EcoRutas Cusco · Desarrollo de Software I · UNSAAC · 2026<br/>
+  Actualizado: 11 Jun 2026 · 15/16 RFs implementados · Progreso: 93.75 %
+</footer>
+
+</body>
+</html>
