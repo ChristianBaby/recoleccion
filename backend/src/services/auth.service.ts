@@ -20,6 +20,7 @@ export async function getProfile(userId: string) {
       id: true, email: true, firstName: true, lastName: true,
       dni: true, phone: true, address: true, district: true,
       role: true, isActive: true, isVerified: true, zoneId: true,
+      alertRadius: true,
       zone: { select: { id: true, name: true, district: true, color: true } },
     },
   })
@@ -29,7 +30,7 @@ export async function getProfile(userId: string) {
 
 export async function updateProfile(
   userId: string,
-  data: { firstName: string; lastName: string; phone?: string; address: string },
+  data: { firstName: string; lastName: string; phone?: string; address: string; alertRadius?: number },
 ) {
   return prisma.user.update({
     where: { id: userId },
@@ -38,11 +39,14 @@ export async function updateProfile(
       lastName: data.lastName,
       phone: data.phone || null,
       address: data.address,
+      ...(data.alertRadius !== undefined && {
+        alertRadius: Math.min(Math.max(data.alertRadius, 100), 2000),
+      }),
     },
     select: {
       id: true, email: true, firstName: true, lastName: true,
       phone: true, address: true, district: true, role: true,
-      zoneId: true,
+      zoneId: true, alertRadius: true,
       zone: { select: { id: true, name: true, district: true, color: true } },
     },
   })

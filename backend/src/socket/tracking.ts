@@ -8,12 +8,19 @@ const ALERT_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutos entre alertas por ciudadano
 // debounce: userId → timestamp del último alert enviado
 const lastProximityAlert = new Map<string, number>()
 
+interface CitizenEntry {
+  id: string
+  homeLat: number
+  homeLng: number
+  alertRadius: number
+}
+
 // caché de ciudadanos por zona (evita consultar BD en cada position update)
-const citizenCache = new Map<string, { id: string; homeLat: number; homeLng: number }[]>()
+const citizenCache = new Map<string, CitizenEntry[]>()
 const citizenCacheTTL = new Map<string, number>()
 const CACHE_TTL_MS = 60_000 // 1 minuto
 
-async function getCitizensInZone(zoneId: string) {
+async function getCitizensInZone(zoneId: string): Promise<CitizenEntry[]> {
   const now = Date.now()
   const cacheTime = citizenCacheTTL.get(zoneId) ?? 0
   if (now - cacheTime < CACHE_TTL_MS && citizenCache.has(zoneId)) {
@@ -28,12 +35,17 @@ async function getCitizensInZone(zoneId: string) {
       homeLat: { not: null },
       homeLng: { not: null },
     },
-    select: { id: true, homeLat: true, homeLng: true },
+    select: { id: true, homeLat: true, homeLng: true, alertRadius: true },
   })
 
-  const result = citizens
+  const result: CitizenEntry[] = citizens
     .filter((c) => c.homeLat !== null && c.homeLng !== null)
-    .map((c) => ({ id: c.id, homeLat: c.homeLat!, homeLng: c.homeLng! }))
+    .map((c) => ({
+      id: c.id,
+      homeLat: c.homeLat!,
+      homeLng: c.homeLng!,
+      alertRadius: c.alertRadius ?? PROXIMITY_RADIUS_METERS,
+    }))
 
   citizenCache.set(zoneId, result)
   citizenCacheTTL.set(zoneId, now)
@@ -51,11 +63,12 @@ async function checkProximityAlerts(io: Server, truck: ActiveTruck) {
     if (now - lastAlert < ALERT_DEBOUNCE_MS) continue
 
     const distance = haversineDistance(truck.lat, truck.lng, citizen.homeLat, citizen.homeLng)
-    if (distance <= PROXIMITY_RADIUS_METERS) {
+    if (distance <= citizen.alertRadius) {
       lastProximityAlert.set(citizen.id, now)
       io.to(`user:${citizen.id}`).emit('proximity:alert', {
         operatorName: truck.operatorName,
         distance: Math.round(distance),
+        alertRadius: citizen.alertRadius,
         zoneId: truck.zoneId,
         timestamp: new Date().toISOString(),
       })

@@ -7,7 +7,7 @@ import { api, ApiError } from '@/lib/api'
 import type { ApiResponse, Zone } from '@/types'
 import { toast } from 'sonner'
 import {
-  User, MapPin, Lock, Loader2, Eye, EyeOff, X, CheckCircle2,
+  User, MapPin, Lock, Loader2, Eye, EyeOff, X, CheckCircle2, Bell,
 } from 'lucide-react'
 
 const LeafletRegisterMap = dynamic(() => import('@/components/LeafletRegisterMap'), {
@@ -30,6 +30,7 @@ interface FullProfile {
   district: string | null
   role: string
   zoneId: string | null
+  alertRadius: number
   zone: { id: string; name: string; district: string; color: string } | null
 }
 
@@ -50,6 +51,7 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
+  const [alertRadius, setAlertRadius] = useState(500)
   const [savingProfile, setSavingProfile] = useState(false)
 
   // Password form
@@ -82,6 +84,7 @@ export default function ProfilePage() {
         setLastName(p.lastName)
         setPhone(p.phone ?? '')
         setAddress(p.address ?? '')
+        setAlertRadius(p.alertRadius ?? 500)
       }
       if (zonesJson.data) setZones(zonesJson.data)
     }).catch(() => toast.error('Error al cargar el perfil')).finally(() => setLoadingProfile(false))
@@ -94,6 +97,7 @@ export default function ProfilePage() {
     try {
       const res = await api.patch<ApiResponse<FullProfile>>('/auth/me/profile', {
         firstName, lastName, phone: phone || undefined, address,
+        ...(user?.role === 'CITIZEN' && { alertRadius }),
       }, accessToken)
       if (res.data) {
         setProfile((p) => p ? { ...p, ...res.data! } : p)
@@ -267,6 +271,43 @@ export default function ProfilePage() {
           </p>
         )}
       </div>
+
+      {/* ── Alertas de proximidad (solo ciudadanos) ────────────────────── */}
+      {isCitizen && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+            <Bell size={15} className="text-emerald-600" /> Alertas de cercanía del camión
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Recibirás una notificación cuando el camión recolector esté dentro de este radio de tu domicilio.
+          </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600">Radio de alerta</span>
+              <span className="text-sm font-bold text-emerald-700 tabular-nums w-16 text-right">
+                {alertRadius >= 1000 ? `${(alertRadius / 1000).toFixed(1)} km` : `${alertRadius} m`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={100} max={2000} step={50}
+              value={alertRadius}
+              onChange={(e) => setAlertRadius(Number(e.target.value))}
+              className="w-full accent-emerald-600 cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>100 m</span>
+              <span>500 m</span>
+              <span>1 km</span>
+              <span>1.5 km</span>
+              <span>2 km</span>
+            </div>
+            <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 leading-relaxed">
+              Guarda los cambios del formulario superior para aplicar el nuevo radio.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Seguridad ──────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">

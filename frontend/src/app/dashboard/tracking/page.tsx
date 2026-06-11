@@ -149,12 +149,24 @@ export default function TrackingPage() {
       toast.success('Retraso notificado a los ciudadanos de la zona.')
     }
 
+    function onProximityAlert({ operatorName, distance }: { operatorName: string; distance: number }) {
+      const distText = distance >= 1000
+        ? `${(distance / 1000).toFixed(1)} km`
+        : `${distance} m`
+      toast('🚛 ¡El camión está cerca!', {
+        description: `${operatorName} está a ${distText} de tu domicilio. Prepara tus residuos.`,
+        duration: 30000,
+        important: true,
+      })
+    }
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('tracking:trucks', onTrucks)
     socket.on('tracking:truck_update', onTruckUpdate)
     socket.on('tracking:truck_removed', onTruckRemoved)
     socket.on('tracking:delay_reported', onDelayReported)
+    socket.on('proximity:alert', onProximityAlert)
     if (socket.connected) { setIsConnected(true); setOwnSocketId(socket.id ?? undefined) }
 
     return () => {
@@ -164,6 +176,7 @@ export default function TrackingPage() {
       socket.off('tracking:truck_update', onTruckUpdate)
       socket.off('tracking:truck_removed', onTruckRemoved)
       socket.off('tracking:delay_reported', onDelayReported)
+      socket.off('proximity:alert', onProximityAlert)
     }
   }, [accessToken])
 
