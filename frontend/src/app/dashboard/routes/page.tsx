@@ -1,15 +1,25 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/context/AuthContext'
 import { api, ApiError } from '@/lib/api'
 import type { ApiResponse, Route, Zone, Vehicle, Operator } from '@/types'
 import { toast } from 'sonner'
 import {
   Plus, Pencil, X, Route as RouteIcon, Loader2,
-  Trash2, Clock, MapPin, Truck, Map,
+  Trash2, Clock, MapPin, Truck, Map, MousePointerClick, CheckCircle2,
 } from 'lucide-react'
 import RouteMapModal from '@/components/RouteMapModal'
+import type { WaypointDraft } from '@/components/LeafletWaypointEditor'
+
+// Leaflet must be client-only
+const LeafletWaypointEditor = dynamic(
+  () => import('@/components/LeafletWaypointEditor'),
+  { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center bg-slate-50"><Loader2 size={24} className="animate-spin text-slate-300" /></div> },
+)
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
@@ -18,6 +28,8 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   ACTIVE:   { label: 'Activa',   cls: 'bg-emerald-50 text-emerald-700' },
   INACTIVE: { label: 'Inactiva', cls: 'bg-red-50 text-red-600' },
 }
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WaypointForm {
   order: number
@@ -45,6 +57,177 @@ const defaultForm: FormState = {
   status: 'DRAFT', waypoints: [],
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function draftToForm(d: WaypointDraft): WaypointForm {
+  return { order: d.order, name: d.name, lat: String(d.lat), lng: String(d.lng), estimatedTime: '' }
+}
+
+function formToDraft(f: WaypointForm): WaypointDraft | null {
+  const lat = parseFloat(f.lat)
+  const lng = parseFloat(f.lng)
+  if (isNaN(lat) || isNaN(lng)) return null
+  return { order: f.order, lat, lng, name: f.name }
+}
+
+// ─── Map Editor Modal ─────────────────────────────────────────────────────────
+
+function WaypointMapEditorModal({
+  initial,
+  zone,
+  onConfirm,
+  onClose,
+}: {
+  initial: WaypointForm[]
+  zone: Zone | null
+  onConfirm: (wps: WaypointForm[]) => void
+  onClose: () => void
+}) {
+  const [drafts, setDrafts] = useState<WaypointDraft[]>(
+    initial.map((f, i) => formToDraft(f) ?? { order: i + 1, lat: 0, lng: 0, name: f.name }).filter((d) => d.lat !== 0),
+  )
+
+  function updateName(idx: number, name: string) {
+    setDrafts((prev) => prev.map((d, i) => (i === idx ? { ...d, name } : d)))
+  }
+
+  function remove(idx: number) {
+    setDrafts((prev) =>
+      prev.filter((_, i) => i !== idx).map((d, i) => ({ ...d, order: i + 1 })),
+    )
+  }
+
+  function clearAll() {
+    setDrafts([])
+  }
+
+  function confirm() {
+    onConfirm(drafts.map(draftToForm))
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
+        <div>
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <MousePointerClick size={16} className="text-blue-600" />
+            Diseñar ruta en el mapa
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Haz clic en el mapa para agregar paradas · Arrastra los marcadores para ajustar posición
+          </p>
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar — waypoints list */}
+        <div className="w-72 border-r border-slate-200 flex flex-col bg-white shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              {drafts.length} parada{drafts.length !== 1 ? 's' : ''}
+            </span>
+            {drafts.length > 0 && (
+              <button
+                onClick={clearAll}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Limpiar todo
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-auto p-3 space-y-2">
+            {drafts.length === 0 ? (
+              <div className="flex flex-col items-center py-12 text-center text-slate-400 gap-2">
+                <MousePointerClick size={32} className="opacity-30" />
+                <p className="text-xs">Haz clic en el mapa para añadir la primera parada</p>
+              </div>
+            ) : (
+              drafts.map((d, idx) => {
+                const isFirst = idx === 0
+                const isLast = idx === drafts.length - 1
+                const dotColor = isFirst ? '#16a34a' : isLast ? '#dc2626' : (zone?.color ?? '#2563eb')
+                return (
+                  <div key={idx} className="flex items-center gap-2 bg-slate-50 rounded-lg px-2 py-2">
+                    <div
+                      className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center
+                        text-white text-xs font-bold"
+                      style={{ backgroundColor: dotColor }}
+                    >
+                      {idx + 1}
+                    </div>
+                    <input
+                      type="text"
+                      value={d.name}
+                      onChange={(e) => updateName(idx, e.target.value)}
+                      placeholder={`Parada ${idx + 1}`}
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-slate-700
+                        placeholder-slate-400"
+                    />
+                    <button
+                      onClick={() => remove(idx)}
+                      className="text-slate-300 hover:text-red-500 transition-colors shrink-0"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Legend */}
+          <div className="p-3 border-t border-slate-100 space-y-1.5 shrink-0">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="w-4 h-4 rounded-full bg-green-600 shrink-0" /> Inicio de ruta
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="w-4 h-4 rounded-full bg-red-600 shrink-0" /> Fin de ruta
+            </div>
+          </div>
+        </div>
+
+        {/* Map */}
+        <div className="flex-1 relative">
+          <LeafletWaypointEditor waypoints={drafts} onChange={setDrafts} zone={zone} />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-6 py-3 border-t border-slate-200 bg-white shrink-0">
+        <p className="text-xs text-slate-400">
+          Los marcadores son arrastrables para ajustar la posición exacta
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg
+              hover:bg-slate-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirm}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white
+              bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <CheckCircle2 size={14} />
+            Confirmar {drafts.length} parada{drafts.length !== 1 ? 's' : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function RoutesPage() {
   const { accessToken, user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
@@ -59,6 +242,8 @@ export default function RoutesPage() {
   const [form, setForm] = useState<FormState>(defaultForm)
   const [saving, setSaving] = useState(false)
   const [mapRouteId, setMapRouteId] = useState<string | null>(null)
+  const [showMapEditor, setShowMapEditor] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('')
 
   const fetchAll = useCallback(async () => {
     if (!accessToken) return
@@ -122,34 +307,6 @@ export default function RoutesPage() {
     }))
   }
 
-  function addWaypoint() {
-    setForm((f) => ({
-      ...f,
-      waypoints: [
-        ...f.waypoints,
-        { order: f.waypoints.length + 1, name: '', lat: '', lng: '', estimatedTime: '' },
-      ],
-    }))
-  }
-
-  function removeWaypoint(idx: number) {
-    setForm((f) => ({
-      ...f,
-      waypoints: f.waypoints
-        .filter((_, i) => i !== idx)
-        .map((wp, i) => ({ ...wp, order: i + 1 })),
-    }))
-  }
-
-  function updateWaypoint(idx: number, field: keyof WaypointForm, value: string) {
-    setForm((f) => ({
-      ...f,
-      waypoints: f.waypoints.map((wp, i) =>
-        i === idx ? { ...wp, [field]: value } : wp,
-      ),
-    }))
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!accessToken) return
@@ -159,12 +316,9 @@ export default function RoutesPage() {
       return
     }
 
-    // Validate waypoints
     for (const wp of form.waypoints) {
-      const lat = parseFloat(wp.lat)
-      const lng = parseFloat(wp.lng)
-      if (isNaN(lat) || isNaN(lng)) {
-        toast.error('Las coordenadas de los puntos de parada son inválidas')
+      if (isNaN(parseFloat(wp.lat)) || isNaN(parseFloat(wp.lng))) {
+        toast.error('Coordenadas de parada inválidas. Usa el editor de mapa.')
         return
       }
     }
@@ -218,26 +372,51 @@ export default function RoutesPage() {
     }
   }
 
+  const selectedZone = zones.find((z) => z.id === form.zoneId) ?? null
+
+  const filteredRoutes = routes.filter((r) => !filterStatus || r.status === filterStatus)
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-8 py-5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <RouteIcon size={18} className="text-blue-600" />
-            Rutas de recolección
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">RF-09 · {routes.length} ruta(s) registradas</p>
+      <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <RouteIcon size={18} className="text-blue-600" /> Rutas de recolección
+            </h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {routes.length} ruta(s) ·{' '}
+              {routes.filter((r) => r.status === 'ACTIVE').length} activas
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg
+                text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} /> Nueva ruta
+            </button>
+          )}
         </div>
-        {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg
-              text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} /> Nueva ruta
-          </button>
-        )}
+
+        {/* Status filter */}
+        <div className="flex gap-2">
+          {(['', 'ACTIVE', 'DRAFT', 'INACTIVE'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                filterStatus === s
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-blue-400'
+              }`}
+            >
+              {s === '' ? 'Todas' : STATUS_LABELS[s]?.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
@@ -246,7 +425,7 @@ export default function RoutesPage() {
           <div className="flex items-center justify-center py-16">
             <Loader2 size={24} className="animate-spin text-slate-300" />
           </div>
-        ) : routes.length === 0 ? (
+        ) : filteredRoutes.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center">
             <RouteIcon size={40} className="text-slate-200 mb-3" />
             <p className="text-slate-400 text-sm">Sin rutas registradas</p>
@@ -260,46 +439,45 @@ export default function RoutesPage() {
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ruta</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Zona</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Días</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hora</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Vehículo</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Operador</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold
+                  text-slate-500 uppercase tracking-wide">
+                  <th className="text-left px-4 py-3">Ruta</th>
+                  <th className="text-left px-4 py-3">Zona</th>
+                  <th className="text-left px-4 py-3">Días</th>
+                  <th className="text-left px-4 py-3">Hora</th>
+                  <th className="text-left px-4 py-3">Vehículo</th>
+                  <th className="text-left px-4 py-3">Operador</th>
+                  <th className="text-left px-4 py-3">Estado</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {routes.map((route) => {
+                {filteredRoutes.map((route) => {
                   const status = STATUS_LABELS[route.status] ?? STATUS_LABELS.DRAFT
                   return (
                     <tr key={route.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{route.name}</div>
                         {route._count && (
-                          <div className="text-xs text-slate-400">{route._count.waypoints} paradas</div>
+                          <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} /> {route._count.waypoints} paradas
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {route.zone && (
                           <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: route.zone.color }}
-                            />
+                            <div className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: route.zone.color }} />
                             <span className="text-slate-700">{route.zone.name}</span>
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-0.5">
+                        <div className="flex gap-0.5 flex-wrap">
                           {route.dayOfWeek.map((d) => (
-                            <span
-                              key={d}
-                              className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-medium"
-                            >
+                            <span key={d}
+                              className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-medium">
                               {DAY_NAMES[d]}
                             </span>
                           ))}
@@ -317,12 +495,12 @@ export default function RoutesPage() {
                             <Truck size={13} className="text-slate-400" />
                             {route.vehicle.plate}
                           </div>
-                        ) : '—'}
+                        ) : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {route.operator
                           ? `${route.operator.firstName} ${route.operator.lastName}`
-                          : '—'}
+                          : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.cls}`}>
@@ -333,8 +511,9 @@ export default function RoutesPage() {
                         <div className="flex items-center gap-1 justify-end">
                           <button
                             onClick={() => setMapRouteId(route.id)}
-                            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                            title="Ver en mapa"
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400
+                              hover:text-blue-600 transition-colors"
+                            title="Ver ruta en mapa"
                           >
                             <Map size={13} />
                           </button>
@@ -342,7 +521,8 @@ export default function RoutesPage() {
                             <>
                               <button
                                 onClick={() => openEdit(route)}
-                                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 transition-colors"
+                                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400
+                                  transition-colors"
                                 title="Editar"
                               >
                                 <Pencil size={13} />
@@ -350,7 +530,8 @@ export default function RoutesPage() {
                               {route.status !== 'INACTIVE' && (
                                 <button
                                   onClick={() => handleDeactivate(route)}
-                                  className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400
+                                    hover:text-red-500 transition-colors"
                                   title="Desactivar"
                                 >
                                   <Trash2 size={13} />
@@ -369,16 +550,12 @@ export default function RoutesPage() {
         )}
       </div>
 
-      {/* Modal de mapa de ruta */}
+      {/* View route on map modal */}
       {mapRouteId && (
-        <RouteMapModal
-          routeId={mapRouteId}
-          zones={zones}
-          onClose={() => setMapRouteId(null)}
-        />
+        <RouteMapModal routeId={mapRouteId} zones={zones} onClose={() => setMapRouteId(null)} />
       )}
 
-      {/* Modal CRUD */}
+      {/* CRUD form modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -386,35 +563,41 @@ export default function RoutesPage() {
               <h2 className="font-semibold text-slate-900">
                 {editRoute ? 'Editar ruta' : 'Nueva ruta de recolección'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+              <button onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
               <div className="px-6 py-5 space-y-5">
+
                 {/* Name + Zone */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Nombre *</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nombre <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       required
                       placeholder="Ej: Ruta Norte Mañana"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      <MapPin size={11} className="inline mr-1" />Zona *
+                      <MapPin size={11} className="inline mr-1" />Zona <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={form.zoneId}
                       onChange={(e) => setForm({ ...form, zoneId: e.target.value })}
                       required
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="">Seleccionar zona...</option>
                       {zones.map((z) => (
@@ -433,7 +616,8 @@ export default function RoutesPage() {
                     <select
                       value={form.vehicleId}
                       onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="">Sin asignar</option>
                       {vehicles.map((v) => (
@@ -448,7 +632,8 @@ export default function RoutesPage() {
                     <select
                       value={form.operatorId}
                       onChange={(e) => setForm({ ...form, operatorId: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="">Sin asignar</option>
                       {operators.map((op) => (
@@ -463,7 +648,7 @@ export default function RoutesPage() {
                 {/* Days */}
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-2">
-                    Días de recolección *
+                    Días de recolección <span className="text-red-500">*</span>
                   </label>
                   <div className="flex gap-2">
                     {DAY_NAMES.map((name, d) => (
@@ -493,18 +678,22 @@ export default function RoutesPage() {
                       type="time"
                       value={form.startTime}
                       onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Duración (min)</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Duración (min)
+                    </label>
                     <input
                       type="number"
                       value={form.estimatedDuration}
                       onChange={(e) => setForm({ ...form, estimatedDuration: e.target.value })}
                       placeholder="Ej: 120"
                       min={1}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -512,7 +701,8 @@ export default function RoutesPage() {
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value as FormState['status'] })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="DRAFT">Borrador</option>
                       <option value="ACTIVE">Activa</option>
@@ -524,63 +714,59 @@ export default function RoutesPage() {
                 {/* Waypoints */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-slate-700">Puntos de parada</label>
+                    <label className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                      <MapPin size={11} className="text-slate-400" />
+                      Paradas de la ruta
+                    </label>
                     <button
                       type="button"
-                      onClick={addWaypoint}
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      onClick={() => setShowMapEditor(true)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-blue-600
+                        bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      <Plus size={12} /> Agregar parada
+                      <MousePointerClick size={12} />
+                      {form.waypoints.length === 0 ? 'Diseñar en mapa' : 'Editar en mapa'}
                     </button>
                   </div>
 
                   {form.waypoints.length === 0 ? (
-                    <p className="text-xs text-slate-400 border border-dashed border-slate-300 rounded-lg py-4 text-center">
-                      Sin paradas definidas
-                    </p>
+                    <div
+                      onClick={() => setShowMapEditor(true)}
+                      className="border-2 border-dashed border-slate-200 rounded-lg py-6 text-center
+                        cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors group"
+                    >
+                      <MousePointerClick size={20} className="mx-auto text-slate-300 group-hover:text-blue-400 mb-1" />
+                      <p className="text-xs text-slate-400 group-hover:text-blue-500">
+                        Haz clic para abrir el editor de mapa
+                      </p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
-                      {form.waypoints.map((wp, idx) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                          <span className="col-span-1 text-xs text-slate-400 text-center">{wp.order}</span>
-                          <input
-                            type="text"
-                            value={wp.name}
-                            onChange={(e) => updateWaypoint(idx, 'name', e.target.value)}
-                            placeholder="Nombre"
-                            className="col-span-3 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <input
-                            type="number"
-                            value={wp.lat}
-                            onChange={(e) => updateWaypoint(idx, 'lat', e.target.value)}
-                            placeholder="Latitud"
-                            step="any"
-                            className="col-span-3 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <input
-                            type="number"
-                            value={wp.lng}
-                            onChange={(e) => updateWaypoint(idx, 'lng', e.target.value)}
-                            placeholder="Longitud"
-                            step="any"
-                            className="col-span-3 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <input
-                            type="time"
-                            value={wp.estimatedTime}
-                            onChange={(e) => updateWaypoint(idx, 'estimatedTime', e.target.value)}
-                            className="col-span-1 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeWaypoint(idx)}
-                            className="col-span-1 flex justify-center text-slate-300 hover:text-red-500"
+                    <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+                      {form.waypoints.slice(0, 4).map((wp, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex
+                            items-center justify-center text-xs font-bold shrink-0"
+                            style={{
+                              backgroundColor: idx === 0 ? '#16a34a'
+                                : idx === form.waypoints.length - 1 ? '#dc2626'
+                                : '#2563eb',
+                            }}
                           >
-                            <X size={14} />
-                          </button>
+                            {idx + 1}
+                          </span>
+                          <span className="flex-1 truncate">
+                            {wp.name || `Parada ${idx + 1}`}
+                          </span>
+                          <span className="text-slate-400 font-mono text-xs shrink-0">
+                            {parseFloat(wp.lat).toFixed(4)}, {parseFloat(wp.lng).toFixed(4)}
+                          </span>
                         </div>
                       ))}
+                      {form.waypoints.length > 4 && (
+                        <p className="text-xs text-slate-400 pl-6">
+                          +{form.waypoints.length - 4} paradas más...
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -590,14 +776,16 @@ export default function RoutesPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
+                  className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300
+                    rounded-lg hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg
+                    hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editRoute ? 'Guardar cambios' : 'Crear ruta'}
@@ -606,6 +794,16 @@ export default function RoutesPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Full-screen map editor */}
+      {showMapEditor && (
+        <WaypointMapEditorModal
+          initial={form.waypoints}
+          zone={selectedZone}
+          onConfirm={(wps) => setForm((f) => ({ ...f, waypoints: wps }))}
+          onClose={() => setShowMapEditor(false)}
+        />
       )}
     </div>
   )
