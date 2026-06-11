@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN "alertRadius" INTEGER NOT NULL DEFAULT 500;
