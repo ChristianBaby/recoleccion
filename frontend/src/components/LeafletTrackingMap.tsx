@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import {
   MapContainer, TileLayer, Polygon, Tooltip,
   Marker, Popup, Polyline, useMap,
@@ -59,27 +59,42 @@ function makeTruckIcon(isOwn: boolean) {
   })
 }
 
-const myPositionIcon = L.divIcon({
+// Live tracking position — solid blue
+const livePositionIcon = L.divIcon({
   html: `<div style="
     width:16px;height:16px;border-radius:50%;
     background:#3b82f6;border:3px solid white;
-    box-shadow:0 0 0 4px rgba(59,130,246,0.25);
+    box-shadow:0 0 0 4px rgba(59,130,246,0.3);
   "></div>`,
   className: '',
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 })
 
-// Idle position (operator not yet tracking)
+// Idle position (before tracking) — blue with pulsing ring
 const idlePositionIcon = L.divIcon({
-  html: `<div style="
-    width:14px;height:14px;border-radius:50%;
-    background:#64748b;border:3px solid white;
-    box-shadow:0 0 0 4px rgba(100,116,139,0.2);
-  "></div>`,
+  html: `<div style="position:relative;width:22px;height:22px;display:flex;align-items:center;justify-content:center;">
+    <div style="
+      position:absolute;inset:0;border-radius:50%;
+      background:rgba(59,130,246,0.25);
+      animation:idle-pulse 2s ease-in-out infinite;
+    "></div>
+    <div style="
+      width:12px;height:12px;border-radius:50%;
+      background:#3b82f6;border:2.5px solid white;
+      box-shadow:0 1px 4px rgba(59,130,246,0.4);
+      position:relative;z-index:1;
+    "></div>
+  </div>
+  <style>
+    @keyframes idle-pulse {
+      0%,100%{transform:scale(1);opacity:0.5}
+      50%{transform:scale(1.6);opacity:0.15}
+    }
+  </style>`,
   className: '',
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
 })
 
 function makeWaypointIcon(label: string, color: string, visited: boolean) {
@@ -112,14 +127,13 @@ function makeWaypointIcon(label: string, color: string, visited: boolean) {
   })
 }
 
-// Pulsing icon for the first waypoint (start of route)
 function makeStartIcon(color: string) {
   return L.divIcon({
     html: `<div style="position:relative;width:36px;height:36px;">
       <div style="
         position:absolute;inset:0;border-radius:50%;
         background:${color};opacity:0.2;
-        animation:pulse-ring 1.5s ease-out infinite;
+        animation:start-pulse 1.5s ease-out infinite;
       "></div>
       <div style="
         position:absolute;inset:4px;border-radius:50%;
@@ -131,10 +145,7 @@ function makeStartIcon(color: string) {
       ">1</div>
     </div>
     <style>
-      @keyframes pulse-ring {
-        0% { transform:scale(0.8);opacity:0.4; }
-        100% { transform:scale(1.8);opacity:0; }
-      }
+      @keyframes start-pulse{0%{transform:scale(.8);opacity:.4}100%{transform:scale(1.8);opacity:0}}
     </style>`,
     className: '',
     iconSize: [36, 36],
@@ -143,7 +154,7 @@ function makeStartIcon(color: string) {
   })
 }
 
-// ─── FitToRoute (auto-zoom when route changes) ────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FitToRoute({ routeId, waypoints }: { routeId: string | null; waypoints: WaypointOverlay[] }) {
   const map = useMap()
@@ -159,13 +170,25 @@ function FitToRoute({ routeId, waypoints }: { routeId: string | null; waypoints:
   return null
 }
 
+// Captures the Leaflet map instance into a ref owned by the parent component
+function MapCapturer({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap()
+  const called = useRef(false)
+  useEffect(() => {
+    if (called.current) return
+    called.current = true
+    onReady(map)
+  }, [map, onReady])
+  return null
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   zones: Zone[]
   trucks: TruckPosition[]
-  myPosition?: { lat: number; lng: number } | null   // live position (tracking active)
-  idlePosition?: { lat: number; lng: number } | null // position before tracking starts
+  myPosition?: { lat: number; lng: number } | null
+  idlePosition?: { lat: number; lng: number } | null
   ownSocketId?: string
   routeOverlay?: RouteOverlay | null
   isTracking?: boolean
@@ -177,10 +200,21 @@ export default function LeafletTrackingMap({
   zones, trucks, myPosition, idlePosition,
   ownSocketId, routeOverlay, isTracking = false,
 }: Props) {
+  const mapRef = useRef<L.Map | null>(null)
+  const onReady = useCallback((m: L.Map) => { mapRef.current = m }, [])
+
   const waypoints = routeOverlay?.waypoints ?? []
   const polyline: [number, number][] = waypoints.map((wp) => [wp.lat, wp.lng])
   const zoneColor = routeOverlay?.zoneColor ?? '#2563eb'
   const visitedIds = routeOverlay?.visitedIds ?? new Set<string>()
+
+  // Current position to fly to (live tracking takes priority over idle)
+  const currentPos = myPosition ?? idlePosition
+
+  function handleLocate() {
+    if (!currentPos || !mapRef.current) return
+    mapRef.current.flyTo([currentPos.lat, currentPos.lng], Math.max(mapRef.current.getZoom(), 17))
+  }
 
   function wpColor(idx: number) {
     if (waypoints.length <= 1) return '#16a34a'
@@ -190,126 +224,159 @@ export default function LeafletTrackingMap({
   }
 
   return (
-    <MapContainer center={CUSCO_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <div style={{ height: '100%', width: '100%', position: 'relative' }}>
+      <MapContainer center={CUSCO_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
+        <MapCapturer onReady={onReady} />
+        <FitToRoute routeId={routeOverlay?.routeId ?? null} waypoints={waypoints} />
 
-      {/* Auto-fit when a new route is selected */}
-      <FitToRoute routeId={routeOverlay?.routeId ?? null} waypoints={waypoints} />
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      {/* Zone polygons */}
-      {zones.filter((z) => z.isActive).map((zone) => {
-        const positions = zone.geometry.coordinates[0].map(
-          ([lng, lat]) => [lat, lng] as [number, number],
-        )
-        return (
-          <Polygon
-            key={zone.id}
-            positions={positions}
-            pathOptions={{ color: zone.color, fillOpacity: 0.08, weight: 1.5 }}
+        {/* Zone polygons */}
+        {zones.filter((z) => z.isActive).map((zone) => {
+          const positions = zone.geometry.coordinates[0].map(
+            ([lng, lat]) => [lat, lng] as [number, number],
+          )
+          return (
+            <Polygon
+              key={zone.id}
+              positions={positions}
+              pathOptions={{ color: zone.color, fillOpacity: 0.08, weight: 1.5 }}
+            >
+              <Tooltip sticky>{zone.name}</Tooltip>
+            </Polygon>
+          )
+        })}
+
+        {/* ── Route overlay ──────────────────────────────────────────────── */}
+        {routeOverlay && waypoints.length >= 2 && (
+          <>
+            <Polyline
+              positions={polyline}
+              pathOptions={{ color: '#ffffff', weight: 7, opacity: 0.5 }}
+            />
+            <Polyline
+              positions={polyline}
+              pathOptions={{
+                color: zoneColor,
+                weight: 4,
+                opacity: 0.85,
+                dashArray: isTracking ? undefined : '10 6',
+              }}
+            />
+          </>
+        )}
+
+        {/* Waypoint markers */}
+        {routeOverlay && waypoints.map((wp, idx) => {
+          const visited = visitedIds.has(wp.id)
+          const color = wpColor(idx)
+          const isFirstUnvisited = !isTracking && idx === 0 && !visited
+          const icon = isFirstUnvisited
+            ? makeStartIcon(color)
+            : makeWaypointIcon(String(idx + 1), color, visited)
+
+          return (
+            <Marker
+              key={wp.id}
+              position={[wp.lat, wp.lng]}
+              icon={icon}
+              zIndexOffset={isFirstUnvisited ? 100 : 0}
+            >
+              <Popup>
+                <div className="text-xs min-w-[130px]">
+                  <p className="font-semibold text-slate-800 leading-tight">
+                    {wp.name ?? `Parada ${wp.order}`}
+                  </p>
+                  {wp.estimatedTime && (
+                    <p className="text-slate-500 mt-1">⏱ {wp.estimatedTime}</p>
+                  )}
+                  <p className={`mt-1 font-medium ${visited ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {visited ? '✓ Visitada' : 'Pendiente'}
+                  </p>
+                  {idx === 0 && !isTracking && (
+                    <p className="mt-1 text-blue-500 font-medium">← Inicio de ruta</p>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          )
+        })}
+
+        {/* Active trucks */}
+        {trucks.map((truck) => (
+          <Marker
+            key={truck.socketId}
+            position={[truck.lat, truck.lng]}
+            icon={makeTruckIcon(truck.socketId === ownSocketId)}
           >
-            <Tooltip sticky>{zone.name}</Tooltip>
-          </Polygon>
-        )
-      })}
-
-      {/* ── Route overlay ─────────────────────────────────────────────────── */}
-      {routeOverlay && waypoints.length >= 2 && (
-        <>
-          {/* White shadow for contrast */}
-          <Polyline
-            positions={polyline}
-            pathOptions={{ color: '#ffffff', weight: 7, opacity: 0.5 }}
-          />
-          {/* Route line — dashed while not tracking, solid while tracking */}
-          <Polyline
-            positions={polyline}
-            pathOptions={{
-              color: zoneColor,
-              weight: 4,
-              opacity: 0.85,
-              dashArray: isTracking ? undefined : '10 6',
-            }}
-          />
-        </>
-      )}
-
-      {/* Waypoint markers */}
-      {routeOverlay && waypoints.map((wp, idx) => {
-        const visited = visitedIds.has(wp.id)
-        const color = wpColor(idx)
-        // First unvisited waypoint gets a pulsing icon while not yet tracking
-        const isFirstUnvisited = !isTracking && idx === 0 && !visited
-        const icon = isFirstUnvisited
-          ? makeStartIcon(color)
-          : makeWaypointIcon(String(idx + 1), color, visited)
-
-        return (
-          <Marker key={wp.id} position={[wp.lat, wp.lng]} icon={icon}
-            zIndexOffset={isFirstUnvisited ? 100 : 0}>
             <Popup>
-              <div className="text-xs min-w-[130px]">
-                <p className="font-semibold text-slate-800 leading-tight">
-                  {wp.name ?? `Parada ${wp.order}`}
-                </p>
-                {wp.estimatedTime && (
-                  <p className="text-slate-500 mt-1">⏱ {wp.estimatedTime}</p>
+              <div className="text-xs">
+                <p className="font-semibold">{truck.operatorName}</p>
+                {truck.speed !== undefined && (
+                  <p className="text-slate-500">{Math.round(truck.speed)} km/h</p>
                 )}
-                <p className={`mt-1 font-medium ${visited ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {visited ? '✓ Visitada' : 'Pendiente'}
+                <p className="text-slate-400">
+                  Última señal: {new Date(truck.lastSeen).toLocaleTimeString('es-PE')}
                 </p>
-                {idx === 0 && !isTracking && (
-                  <p className="mt-1 text-blue-500 font-medium">← Inicio de ruta</p>
-                )}
               </div>
             </Popup>
           </Marker>
-        )
-      })}
+        ))}
 
-      {/* Active trucks */}
-      {trucks.map((truck) => (
-        <Marker
-          key={truck.socketId}
-          position={[truck.lat, truck.lng]}
-          icon={makeTruckIcon(truck.socketId === ownSocketId)}
+        {/* Live position (during tracking) */}
+        {myPosition && (
+          <Marker
+            position={[myPosition.lat, myPosition.lng]}
+            icon={livePositionIcon}
+            zIndexOffset={200}
+          >
+            <Popup>
+              <p className="text-xs font-medium">Mi posición actual</p>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Idle position (before tracking) */}
+        {idlePosition && !myPosition && (
+          <Marker
+            position={[idlePosition.lat, idlePosition.lng]}
+            icon={idlePositionIcon}
+            zIndexOffset={150}
+          >
+            <Popup>
+              <p className="text-xs text-slate-700 font-medium">Tu ubicación actual</p>
+              <p className="text-xs text-slate-400 mt-0.5">GPS activo · sin ruta iniciada</p>
+            </Popup>
+          </Marker>
+        )}
+      </MapContainer>
+
+      {/* ── "My location" button — overlaid on the map ─────────────────────── */}
+      {currentPos && (
+        <button
+          onClick={handleLocate}
+          title="Ir a mi ubicación"
+          style={{ zIndex: 1000 }}
+          className="absolute bottom-6 left-3 bg-white hover:bg-blue-50 border border-slate-200
+            hover:border-blue-400 rounded-xl shadow-md px-3 py-2.5 flex items-center gap-2
+            text-xs font-semibold text-slate-700 hover:text-blue-600 transition-all
+            active:scale-95"
         >
-          <Popup>
-            <div className="text-xs">
-              <p className="font-semibold">{truck.operatorName}</p>
-              {truck.speed !== undefined && (
-                <p className="text-slate-500">{Math.round(truck.speed)} km/h</p>
-              )}
-              <p className="text-slate-400">
-                Última señal: {new Date(truck.lastSeen).toLocaleTimeString('es-PE')}
-              </p>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-
-      {/* Live position (during tracking) */}
-      {myPosition && (
-        <Marker position={[myPosition.lat, myPosition.lng]} icon={myPositionIcon}
-          zIndexOffset={200}>
-          <Popup>
-            <p className="text-xs font-medium">Mi posición actual</p>
-          </Popup>
-        </Marker>
+          {/* location crosshair SVG */}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <line x1="12" y1="2" x2="12" y2="6" />
+            <line x1="12" y1="18" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="6" y2="12" />
+            <line x1="18" y1="12" x2="22" y2="12" />
+          </svg>
+          Mi ubicación
+        </button>
       )}
-
-      {/* Idle position (before tracking — so operator can see where they are) */}
-      {idlePosition && !myPosition && (
-        <Marker position={[idlePosition.lat, idlePosition.lng]} icon={idlePositionIcon}
-          zIndexOffset={150}>
-          <Popup>
-            <p className="text-xs text-slate-600 font-medium">Tu ubicación actual</p>
-            <p className="text-xs text-slate-400 mt-0.5">GPS inactivo</p>
-          </Popup>
-        </Marker>
-      )}
-    </MapContainer>
+    </div>
   )
 }

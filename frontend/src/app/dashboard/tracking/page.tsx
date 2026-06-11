@@ -594,7 +594,7 @@ export default function TrackingPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-slate-600">
-                  <div className="w-4 h-4 rounded-full bg-slate-400 shrink-0" /> Mi ubicación
+                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi ubicación
                 </div>
               )}
             </div>
@@ -604,7 +604,7 @@ export default function TrackingPage() {
 
       {/* Start-position warning modal */}
       {showStartWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
@@ -660,7 +660,7 @@ export default function TrackingPage() {
 
       {/* RF-13 delay modal */}
       {showDelayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
