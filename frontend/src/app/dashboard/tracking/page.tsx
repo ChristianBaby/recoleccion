@@ -9,10 +9,11 @@ import type { ApiResponse, Route, Zone, Waypoint } from '@/types'
 import type { TruckPosition } from '@/components/LeafletTrackingMap'
 import {
   Radio, Square, Navigation, Wifi, WifiOff, MapPin, Clock,
-  AlertCircle, X, CheckCircle2, Circle,
+  AlertCircle, X, CheckCircle2, Circle, TriangleAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import ZoneGuard from '@/components/ZoneGuard'
+import type { RouteOverlay } from '@/components/LeafletTrackingMap'
 
 const LeafletTrackingMap = dynamic(() => import('@/components/LeafletTrackingMap'), { ssr: false })
 
@@ -50,6 +51,14 @@ export default function TrackingPage() {
   const watchIdRef = useRef<number | null>(null)
   const isTrackingRef = useRef(false)
 
+  // idle GPS — operator's position before tracking starts
+  const [idlePosition, setIdlePosition] = useState<{ lat: number; lng: number } | null>(null)
+
+  // start-position warning
+  const [showStartWarning, setShowStartWarning] = useState(false)
+  const [distanceToStart, setDistanceToStart] = useState(0)
+  const [startWaypointName, setStartWaypointName] = useState('')
+
   // RF-13
   const [showDelayModal, setShowDelayModal] = useState(false)
   const [delayMinutes, setDelayMinutes] = useState(20)
@@ -86,6 +95,18 @@ export default function TrackingPage() {
       .then((r) => setSelectedRouteDetail(r.data ?? null))
       .catch(() => {})
   }, [accessToken, selectedRouteId])
+
+  // ── Get idle GPS position for OPERATOR (so they can see themselves on the map
+  //    before pressing "Iniciar ruta" and for the proximity check) ─────────────
+  useEffect(() => {
+    if (user?.role !== 'OPERATOR') return
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setIdlePosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => { /* GPS not available — silently ignore */ },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }, [user?.role])
 
   // ── Mark waypoints visited when position changes ───────────────────────────
   useEffect(() => {
@@ -161,19 +182,21 @@ export default function TrackingPage() {
     else socket.emit('tracking:all')
   }, [selectedZoneId, isConnected, user?.role, user?.zoneId])
 
-  // ── GPS start / stop ──────────────────────────────────────────────────────
-  const startTracking = useCallback(() => {
+  // ── Internal: begin GPS watch + emit tracking:start ──────────────────────
+  const beginTracking = useCallback(() => {
     const socket = socketRef.current
     if (!socket) return
     socket.emit('tracking:start', { routeId: selectedRouteId || undefined })
     setIsTracking(true)
     isTrackingRef.current = true
     setVisitedWaypoints(new Set())
+    setShowStartWarning(false)
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, speed } = pos.coords
         setMyPosition({ lat: latitude, lng: longitude })
+        setIdlePosition(null) // clear idle dot once tracking is live
         socket.emit('tracking:position', {
           lat: latitude, lng: longitude,
           speed: speed != null ? speed * 3.6 : undefined,
@@ -183,6 +206,26 @@ export default function TrackingPage() {
       { enableHighAccuracy: true, maximumAge: 5000 },
     )
   }, [selectedRouteId])
+
+  // ── GPS start — checks proximity to first waypoint first ─────────────────
+  const startTracking = useCallback(() => {
+    const sortedWps = [...(selectedRouteDetail?.waypoints ?? [])].sort(
+      (a, b) => a.order - b.order,
+    )
+    const firstWp = sortedWps[0]
+    const pos = idlePosition
+
+    if (firstWp && pos) {
+      const dist = haversineMeters(pos.lat, pos.lng, firstWp.lat, firstWp.lng)
+      if (dist > 500) {
+        setDistanceToStart(Math.round(dist))
+        setStartWaypointName(firstWp.name ?? `Parada 1`)
+        setShowStartWarning(true)
+        return
+      }
+    }
+    beginTracking()
+  }, [idlePosition, selectedRouteDetail, beginTracking])
 
   const stopTracking = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -217,6 +260,15 @@ export default function TrackingPage() {
   )
   const visitedCount = waypoints.filter((wp) => visitedWaypoints.has(wp.id)).length
   const progressPct = waypoints.length > 0 ? Math.round((visitedCount / waypoints.length) * 100) : 0
+
+  const routeOverlay: RouteOverlay | null = selectedRouteDetail && waypoints.length > 0
+    ? {
+        routeId: selectedRouteDetail.id,
+        waypoints,
+        zoneColor: selectedRoute?.zone?.color ?? '#2563eb',
+        visitedIds: visitedWaypoints,
+      }
+    : null
 
   return (
     <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
@@ -514,10 +566,97 @@ export default function TrackingPage() {
             zones={zones}
             trucks={trucks}
             myPosition={myPosition}
+            idlePosition={idlePosition}
             ownSocketId={ownSocketId}
+            routeOverlay={routeOverlay}
+            isTracking={isTracking}
           />
+          {/* Map legend for operator */}
+          {user?.role === 'OPERATOR' && routeOverlay && (
+            <div className="absolute bottom-4 right-4 z-[1000] bg-white rounded-xl shadow-lg
+              border border-slate-200 px-3 py-2.5 space-y-1.5 text-xs">
+              <p className="font-semibold text-slate-600 uppercase tracking-wide text-xs mb-2">
+                Leyenda
+              </p>
+              <div className="flex items-center gap-2 text-slate-600">
+                <div className="w-4 h-4 rounded-full bg-green-600 shrink-0" /> Inicio
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <div className="w-4 h-4 rounded-full bg-red-600 shrink-0" /> Final
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center text-emerald-600 font-bold" style={{fontSize:'8px'}}>✓</div>
+                Visitada
+              </div>
+              {isTracking ? (
+                <div className="flex items-center gap-2 text-slate-600">
+                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi posición
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-600">
+                  <div className="w-4 h-4 rounded-full bg-slate-400 shrink-0" /> Mi ubicación
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Start-position warning modal */}
+      {showStartWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                <TriangleAlert size={20} className="text-amber-500" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900">Lejos del inicio de la ruta</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Verifica tu posición antes de iniciar</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-amber-700 font-medium">Distancia al inicio</span>
+                <span className="text-sm font-bold text-amber-800">
+                  {distanceToStart >= 1000
+                    ? `${(distanceToStart / 1000).toFixed(1)} km`
+                    : `${distanceToStart} m`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-amber-700 font-medium">Punto de inicio</span>
+                <span className="text-xs text-amber-800 font-medium max-w-[160px] text-right truncate">
+                  {startWaypointName}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+              Tu posición actual está a más de 500 m del inicio de la ruta.
+              Dirígete al punto de partida o inicia de todos modos si ya te encuentras en ruta.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowStartWarning(false)}
+                className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm
+                  text-slate-600 hover:bg-slate-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={beginTracking}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl
+                  py-2.5 text-sm font-semibold transition-colors"
+              >
+                Iniciar de todos modos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* RF-13 delay modal */}
       {showDelayModal && (
