@@ -11,6 +11,7 @@ interface Props {
 
 export default function ZoneGuard({ role, zoneId, children }: Props) {
   if (role === 'ADMIN') return <>{children}</>
+  if (role === 'OPERATOR') return <>{children}</>
   if (zoneId) return <>{children}</>
 
   return (

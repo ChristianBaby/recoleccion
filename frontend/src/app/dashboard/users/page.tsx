@@ -472,8 +472,8 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 justify-center">
-                        {/* Assign zone — only for CITIZEN */}
-                        {u.role === 'CITIZEN' && (
+                        {/* Assign zone — for CITIZEN and OPERATOR */}
+                        {(u.role === 'CITIZEN' || u.role === 'OPERATOR') && (
                           <button
                             onClick={() => openAssign(u)}
                             className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium
