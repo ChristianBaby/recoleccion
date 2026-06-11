@@ -92,7 +92,7 @@ export async function assignZoneToUser(userId: string, lat: number, lng: number)
 
   await prisma.user.update({
     where: { id: userId },
-    data: { zoneId: zone?.id ?? null },
+    data: { zoneId: zone?.id ?? null, homeLat: lat, homeLng: lng },
   })
 
   return zone

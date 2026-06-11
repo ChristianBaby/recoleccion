@@ -97,6 +97,10 @@ model User {
   zoneId String?
   zone   Zone?   @relation(fields: [zoneId], references: [id])
 
+  // RF-12: Coordenadas del hogar para alertas de proximidad
+  homeLat Float?
+  homeLng Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

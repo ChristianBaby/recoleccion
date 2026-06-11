@@ -20,6 +20,7 @@ import {
   Users,
   UserCircle,
 } from 'lucide-react'
+import ProximityAlertListener from '@/components/ProximityAlertListener'
 
 interface NavItem {
   href: string
@@ -181,6 +182,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+
+      {/* RF-12: Alerta de proximidad del camión (solo ciudadanos) */}
+      {user?.role === 'CITIZEN' && <ProximityAlertListener />}
     </div>
   )
 }

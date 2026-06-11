@@ -36,6 +36,8 @@ export function setupSocketServer(httpServer: HttpServer, frontendUrl: string): 
   })
 
   io.on('connection', (socket) => {
+    const connectedUser = socket.data.user as { id: string }
+    socket.join(`user:${connectedUser.id}`)
     setupTrackingHandlers(io, socket)
   })
 

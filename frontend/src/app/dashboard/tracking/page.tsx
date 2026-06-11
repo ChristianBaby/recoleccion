@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { getSocket } from '@/lib/socket'
 import type { ApiResponse, Route, Zone } from '@/types'
 import type { TruckPosition } from '@/components/LeafletTrackingMap'
-import { Radio, Square, Navigation, Wifi, WifiOff, MapPin } from 'lucide-react'
+import { Radio, Square, Navigation, Wifi, WifiOff, MapPin, Clock, AlertCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import ZoneGuard from '@/components/ZoneGuard'
 
@@ -27,6 +27,12 @@ export default function TrackingPage() {
   const socketRef = useRef<ReturnType<typeof getSocket> | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const isTrackingRef = useRef(false)
+
+  // RF-13: Estado del modal de reporte de retraso
+  const [showDelayModal, setShowDelayModal] = useState(false)
+  const [delayMinutes, setDelayMinutes] = useState(20)
+  const [delayReason, setDelayReason] = useState('')
+  const [delayReported, setDelayReported] = useState(false)
 
   // Load zones + operator routes
   useEffect(() => {
@@ -75,11 +81,18 @@ export default function TrackingPage() {
       setTrucks((prev) => prev.filter((t) => t.socketId !== socketId))
     }
 
+    function onDelayReported() {
+      setDelayReported(true)
+      setShowDelayModal(false)
+      toast.success('Retraso reportado. Los ciudadanos de la zona fueron notificados.')
+    }
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('tracking:trucks', onTrucks)
     socket.on('tracking:truck_update', onTruckUpdate)
     socket.on('tracking:truck_removed', onTruckRemoved)
+    socket.on('tracking:delay_reported', onDelayReported)
 
     if (socket.connected) {
       setIsConnected(true)
@@ -92,6 +105,7 @@ export default function TrackingPage() {
       socket.off('tracking:trucks', onTrucks)
       socket.off('tracking:truck_update', onTruckUpdate)
       socket.off('tracking:truck_removed', onTruckRemoved)
+      socket.off('tracking:delay_reported', onDelayReported)
     }
   }, [accessToken])
 
@@ -139,6 +153,12 @@ export default function TrackingPage() {
       { enableHighAccuracy: true, maximumAge: 5000 },
     )
   }, [selectedRouteId])
+
+  const submitDelay = useCallback(() => {
+    const socket = socketRef.current
+    if (!socket) return
+    socket.emit('tracking:report_delay', { delayMinutes, reason: delayReason.trim() || undefined })
+  }, [delayMinutes, delayReason])
 
   const stopTracking = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -241,6 +261,27 @@ export default function TrackingPage() {
                 <p className="font-mono text-emerald-600">
                   {myPosition.lat.toFixed(5)}, {myPosition.lng.toFixed(5)}
                 </p>
+              </div>
+            )}
+
+            {/* RF-13: Botón reportar retraso */}
+            {isTracking && (
+              <button
+                onClick={() => { setShowDelayModal(true); setDelayReported(false) }}
+                className="flex items-center justify-center gap-2 w-full border border-amber-300
+                  bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg py-2 text-xs
+                  font-medium transition-colors"
+              >
+                <Clock size={13} />
+                Reportar retraso
+              </button>
+            )}
+
+            {delayReported && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50
+                border border-amber-200 rounded-lg px-3 py-2">
+                <AlertCircle size={13} />
+                Retraso notificado a la zona
               </div>
             )}
 
@@ -371,6 +412,78 @@ export default function TrackingPage() {
           />
         </div>
       </div>
+
+      {/* RF-13: Modal reporte de retraso */}
+      {showDelayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                <Clock size={16} className="text-amber-500" />
+                Reportar retraso
+              </h2>
+              <button
+                onClick={() => setShowDelayModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={16} className="text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Minutos de retraso
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={delayMinutes}
+                  onChange={(e) => setDelayMinutes(Number(e.target.value))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Motivo (opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Tráfico, falla mecánica..."
+                  value={delayReason}
+                  onChange={(e) => setDelayReason(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+                Los ciudadanos de tu zona recibirán una notificación inmediata.
+              </p>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowDelayModal(false)}
+                  className="flex-1 border border-slate-200 rounded-lg py-2 text-sm
+                    text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitDelay}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg
+                    py-2 text-sm font-semibold transition-colors"
+                >
+                  Notificar retraso
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </ZoneGuard>
   )

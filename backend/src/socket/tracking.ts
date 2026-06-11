@@ -1,5 +1,67 @@
 import { Server, Socket } from 'socket.io'
 import { prisma } from '../config/prisma'
+import { haversineDistance } from '../utils/geoUtils'
+
+const PROXIMITY_RADIUS_METERS = 500
+const ALERT_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutos entre alertas por ciudadano
+
+// debounce: userId → timestamp del último alert enviado
+const lastProximityAlert = new Map<string, number>()
+
+// caché de ciudadanos por zona (evita consultar BD en cada position update)
+const citizenCache = new Map<string, { id: string; homeLat: number; homeLng: number }[]>()
+const citizenCacheTTL = new Map<string, number>()
+const CACHE_TTL_MS = 60_000 // 1 minuto
+
+async function getCitizensInZone(zoneId: string) {
+  const now = Date.now()
+  const cacheTime = citizenCacheTTL.get(zoneId) ?? 0
+  if (now - cacheTime < CACHE_TTL_MS && citizenCache.has(zoneId)) {
+    return citizenCache.get(zoneId)!
+  }
+
+  const citizens = await prisma.user.findMany({
+    where: {
+      zoneId,
+      role: 'CITIZEN',
+      isActive: true,
+      homeLat: { not: null },
+      homeLng: { not: null },
+    },
+    select: { id: true, homeLat: true, homeLng: true },
+  })
+
+  const result = citizens
+    .filter((c) => c.homeLat !== null && c.homeLng !== null)
+    .map((c) => ({ id: c.id, homeLat: c.homeLat!, homeLng: c.homeLng! }))
+
+  citizenCache.set(zoneId, result)
+  citizenCacheTTL.set(zoneId, now)
+  return result
+}
+
+async function checkProximityAlerts(io: Server, truck: ActiveTruck) {
+  if (!truck.zoneId) return
+
+  const now = Date.now()
+  const citizens = await getCitizensInZone(truck.zoneId)
+
+  for (const citizen of citizens) {
+    const lastAlert = lastProximityAlert.get(citizen.id) ?? 0
+    if (now - lastAlert < ALERT_DEBOUNCE_MS) continue
+
+    const distance = haversineDistance(truck.lat, truck.lng, citizen.homeLat, citizen.homeLng)
+    if (distance <= PROXIMITY_RADIUS_METERS) {
+      lastProximityAlert.set(citizen.id, now)
+      io.to(`user:${citizen.id}`).emit('proximity:alert', {
+        operatorName: truck.operatorName,
+        distance: Math.round(distance),
+        zoneId: truck.zoneId,
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }
+}
 
 interface ActiveTruck {
   socketId: string
@@ -98,6 +160,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     }
     activeTrucks.set(socket.id, truck)
     broadcastTruckUpdate(io, truck)
+    checkProximityAlerts(io, truck).catch(() => { /* no bloquear el flujo de tracking */ })
 
     // Guardar en BD si hay RouteExecution
     if (socket.data.executionId) {
@@ -125,6 +188,40 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     socket.emit('tracking:trucks', Array.from(activeTrucks.values()))
   })
 
+  // ── Operador: reportar retraso (RF-13) ───────────────────────────────────
+  socket.on('tracking:report_delay', async ({
+    delayMinutes,
+    reason,
+  }: { delayMinutes: number; reason?: string }) => {
+    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') return
+    if (!socket.data.executionId || !socket.data.zoneId) return
+
+    const zoneId = socket.data.zoneId as string
+
+    // Persiste el retraso en la ejecución activa
+    const execution = await prisma.routeExecution.update({
+      where: { id: socket.data.executionId },
+      data: { status: 'DELAYED', delayMinutes },
+      include: { route: { select: { name: true } } },
+    }).catch(() => null)
+
+    if (!execution) return
+
+    // Notifica a los ciudadanos de la zona y al admin
+    const alert = {
+      routeName: execution.route.name,
+      delayMinutes,
+      reason: reason ?? '',
+      zoneId,
+      operatorName: user.name,
+      timestamp: new Date().toISOString(),
+    }
+    io.to(`zone:${zoneId}`).emit('route:delay_alert', alert)
+    io.to('admin_room').emit('route:delay_alert', alert)
+
+    socket.emit('tracking:delay_reported', { ok: true })
+  })
+
   // ── Operador: detener seguimiento ─────────────────────────────────────────
   socket.on('tracking:stop', async () => {
     await cleanupTracking(socket, io)
@@ -136,6 +233,11 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
       await cleanupTracking(socket, io)
     }
   })
+}
+
+export function invalidateCitizenCache(zoneId: string) {
+  citizenCache.delete(zoneId)
+  citizenCacheTTL.delete(zoneId)
 }
 
 async function cleanupTracking(socket: Socket, io: Server) {

@@ -53,6 +53,9 @@ interface ComplianceRoute {
   inProgress: number
   compliancePct: number
   avgDelayMinutes: number
+  totalWaypoints: number
+  missedStopsTotal: number
+  missedStopsPct: number
 }
 
 interface ParticipationData {
@@ -417,13 +420,15 @@ function ComplianceTab({
   }))
 
   function getExportDataCompliance() {
-    const headers = ['Ruta', 'Zona', 'Operador', 'Vehículo', 'Total Ejec.', 'Completadas', 'Con Retraso', 'Canceladas', 'Cumplimiento %', 'Retraso Prom. (min)']
+    const headers = ['Ruta', 'Zona', 'Operador', 'Vehículo', 'Total Ejec.', 'Completadas', 'Con Retraso', 'Canceladas', 'Cumplimiento %', 'Retraso Prom. (min)', 'Paradas omitidas', '% Omisión']
     const rows = data.map((r) => [
       r.routeName, r.zone?.name ?? '',
       r.operator ? `${r.operator.firstName} ${r.operator.lastName}` : '',
       r.vehicle?.plate ?? '',
       String(r.totalExecutions), String(r.completed), String(r.delayed),
       String(r.cancelled), `${r.compliancePct}%`, String(r.avgDelayMinutes),
+      r.totalWaypoints > 0 ? String(r.missedStopsTotal) : 'Sin GPS',
+      r.totalWaypoints > 0 ? `${r.missedStopsPct}%` : '—',
     ])
     return { headers, rows }
   }
@@ -491,6 +496,7 @@ function ComplianceTab({
                 <th className="text-right px-4 py-3">Ejec.</th>
                 <th className="text-right px-4 py-3">Compl.</th>
                 <th className="text-right px-4 py-3">Retraso prom.</th>
+                <th className="text-center px-4 py-3">Paradas omitidas</th>
                 <th className="text-center px-4 py-3">Cumplimiento</th>
               </tr>
             </thead>
@@ -524,6 +530,27 @@ function ComplianceTab({
                   <td className="px-4 py-3 text-right text-emerald-600">{r.completed}</td>
                   <td className="px-4 py-3 text-right text-slate-500">
                     {r.avgDelayMinutes > 0 ? `${r.avgDelayMinutes} min` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {r.totalWaypoints === 0 ? (
+                      <span className="text-xs text-slate-300">Sin paradas</span>
+                    ) : r.totalExecutions === 0 || (r.missedStopsTotal === 0 && r.missedStopsPct === 0) ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">
+                        0 omitidas
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          r.missedStopsPct >= 50
+                            ? 'bg-red-50 text-red-600'
+                            : r.missedStopsPct >= 20
+                            ? 'bg-amber-50 text-amber-600'
+                            : 'bg-yellow-50 text-yellow-700'
+                        }`}
+                      >
+                        {r.missedStopsTotal} ({r.missedStopsPct}%)
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
