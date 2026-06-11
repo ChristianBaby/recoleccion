@@ -26,6 +26,8 @@ import {
   TrendingUp,
   Trash2,
   Route,
+  BookOpen,
+  Megaphone,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ interface ComplianceRoute {
 }
 
 interface ParticipationData {
-  summary: { totalCitizens: number; totalIncidents: number }
+  summary: { totalCitizens: number; totalIncidents: number; totalLearnVisits: number }
   byZone: {
     zoneId: string
     zoneName: string
@@ -67,6 +69,8 @@ interface ParticipationData {
     color: string
     citizenCount: number
     incidents: { total: number; open: number; resolved: number; byType: Record<string, number> }
+    learnVisits: number
+    learnUniqueUsers: number
   }[]
 }
 
@@ -616,13 +620,19 @@ function ParticipationTab({
   }))
 
   function getExportDataParticipation() {
-    const headers = ['Zona', 'Distrito', 'Ciudadanos', 'Total Incidencias', 'Abiertas', 'Resueltas']
+    const headers = ['Zona', 'Distrito', 'Ciudadanos', 'Total Incidencias', 'Abiertas', 'Resueltas', 'Consultas educativas', 'Usuarios únicos (edu.)']
     const rows = byZone.map((z) => [
       z.zoneName, z.district, String(z.citizenCount),
       String(z.incidents.total), String(z.incidents.open), String(z.incidents.resolved),
+      String(z.learnVisits), String(z.learnUniqueUsers),
     ])
     return { headers, rows }
   }
+
+  // Zonas con baja participación: < 2 incidencias Y < 3 consultas educativas
+  const lowParticipationZones = byZone.filter(
+    (z) => z.citizenCount > 0 && z.incidents.total < 2 && z.learnVisits < 3,
+  )
 
   return (
     <div className="space-y-6">
@@ -633,7 +643,7 @@ function ParticipationTab({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard
               icon={<Users size={18} />}
               label="Ciudadanos registrados"
@@ -650,12 +660,49 @@ function ParticipationTab({
             />
             <StatCard
               icon={<CheckCircle2 size={18} />}
-              label="Resueltas"
+              label="Incidencias resueltas"
               value={byZone.reduce((s, z) => s + z.incidents.resolved, 0)}
               sub="Cerradas o resueltas"
               color="emerald"
             />
+            <StatCard
+              icon={<BookOpen size={18} />}
+              label="Consultas educativas"
+              value={data?.summary.totalLearnVisits ?? 0}
+              sub="Visitas a Aprende a segregar"
+              color="blue"
+            />
           </div>
+
+          {/* RF-16: Sugerencia de difusión para zonas con baja participación */}
+          {lowParticipationZones.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <Megaphone size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    Zonas con baja participación — se recomienda acción de difusión
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5 mb-2">
+                    Las siguientes zonas tienen pocos reportes de incidencias y escasas consultas educativas.
+                    Considera campañas de sensibilización, notificaciones o visitas presenciales.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {lowParticipationZones.map((z) => (
+                      <span
+                        key={z.zoneId}
+                        className="flex items-center gap-1.5 text-xs bg-white border border-amber-200
+                          text-amber-800 px-2.5 py-1 rounded-full font-medium"
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: z.color }} />
+                        {z.zoneName}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Chart */}
           <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -697,6 +744,7 @@ function ParticipationTab({
                     <th className="text-right px-4 py-3">Incidencias</th>
                     <th className="text-right px-4 py-3">Abiertas</th>
                     <th className="text-right px-4 py-3">Resueltas</th>
+                    <th className="text-right px-4 py-3">Consultas edu.</th>
                     <th className="text-left px-4 py-3">Por tipo</th>
                   </tr>
                 </thead>
@@ -714,6 +762,14 @@ function ParticipationTab({
                       <td className="px-4 py-3 text-right font-semibold text-slate-700">{z.incidents.total}</td>
                       <td className="px-4 py-3 text-right text-amber-600">{z.incidents.open}</td>
                       <td className="px-4 py-3 text-right text-emerald-600">{z.incidents.resolved}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-semibold text-blue-600">{z.learnVisits}</span>
+                        {z.learnUniqueUsers > 0 && (
+                          <span className="text-slate-400 text-xs ml-1">
+                            ({z.learnUniqueUsers} únicos)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {Object.keys(z.incidents.byType).length === 0 ? (
                           <span className="text-slate-300 text-xs">—</span>

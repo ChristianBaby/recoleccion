@@ -30,6 +30,9 @@ export default function LearnPage() {
       .then((r) => setWasteTypes((r.data ?? []).filter((w) => w.isActive)))
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    // RF-16: Registrar visita educativa para el reporte de participación
+    api.post('/page-visits/learn', {}, accessToken).catch(() => {})
   }, [accessToken])
 
   const filtered = useMemo(() => {

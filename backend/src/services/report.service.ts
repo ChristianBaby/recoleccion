@@ -206,6 +206,7 @@ export async function getRouteCompliance(filters: { from?: string; to?: string; 
 export async function getCitizenParticipation(filters: { from?: string; to?: string; zoneId?: string }) {
   const dateFilter = buildDateFilter(filters.from, filters.to)
 
+
   const zoneWhere = filters.zoneId
     ? { isActive: true, id: filters.zoneId }
     : { isActive: true }
@@ -272,10 +273,34 @@ export async function getCitizenParticipation(filters: { from?: string; to?: str
       : undefined,
   )
 
+  // RF-16: Consultas educativas — visitas a la página "Aprende a segregar"
+  const learnVisitWhere = {
+    ...(dateFilter && { createdAt: dateFilter }),
+    ...(filters.zoneId && { zoneId: filters.zoneId }),
+  }
+
+  const learnVisits = await prisma.learnVisit.findMany({
+    where: learnVisitWhere,
+    select: { zoneId: true, userId: true },
+  })
+
+  // Contar visitas y visitantes únicos por zona
+  const learnByZone = new Map<string, { visits: number; uniqueUsers: Set<string> }>()
+  for (const v of learnVisits) {
+    const zId = v.zoneId ?? '__unknown__'
+    if (!learnByZone.has(zId)) learnByZone.set(zId, { visits: 0, uniqueUsers: new Set() })
+    const e = learnByZone.get(zId)!
+    e.visits++
+    e.uniqueUsers.add(v.userId)
+  }
+
+  const totalLearnVisits = learnVisits.length
+
   return {
-    summary: { totalCitizens, totalIncidents },
+    summary: { totalCitizens, totalIncidents, totalLearnVisits },
     byZone: zones.map((z) => {
       const inc = incidentsByZone.get(z.id)
+      const lv = learnByZone.get(z.id)
       return {
         zoneId: z.id,
         zoneName: z.name,
@@ -288,6 +313,8 @@ export async function getCitizenParticipation(filters: { from?: string; to?: str
           resolved: inc?.resolved ?? 0,
           byType: inc ? Object.fromEntries(inc.byType) : {} as Record<string, number>,
         },
+        learnVisits: lv?.visits ?? 0,
+        learnUniqueUsers: lv ? lv.uniqueUsers.size : 0,
       }
     }),
   }

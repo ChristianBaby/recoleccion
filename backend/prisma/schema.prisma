@@ -110,6 +110,7 @@ model User {
   incidents        Incident[]
   createdZones     Zone[]          @relation("AdminZones")
   createdRoutes    Route[]         @relation("AdminRoutes")
+  learnVisits      LearnVisit[]
 
   @@index([email])
   @@index([dni])
@@ -304,6 +305,20 @@ model GpsTrack {
 
   @@index([routeExecutionId, timestamp])
   @@map("gps_tracks")
+}
+
+// ─── Módulo 6: Consultas educativas (RF-16) ──────────────────────────────────
+
+model LearnVisit {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zoneId    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([zoneId, createdAt])
+  @@map("learn_visits")
 }
 
 // ─── Módulo 4: Incidencias Ciudadanas ─────────────────────────────────────────
