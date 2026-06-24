@@ -34,6 +34,11 @@ export const registerSchema = z.object({
     .max(200)
     .trim(),
   district: z.string().min(2, 'Seleccione un distrito').trim(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  consent: z.boolean().refine((val) => val === true, {
+    message: 'Debes aceptar los términos y condiciones de privacidad',
+  }),
 })
 
 export const loginSchema = z.object({

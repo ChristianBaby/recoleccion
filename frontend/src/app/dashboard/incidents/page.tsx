@@ -7,10 +7,11 @@ import type { ApiResponse, Incident, IncidentStatus } from '@/types'
 import { toast } from 'sonner'
 import {
   Plus, X, Loader2, AlertTriangle, MapPin, Copy, Check,
-  ChevronDown, ImagePlus, Trash2, Filter,
+  ChevronDown, ImagePlus, Trash2, Filter, AlertCircle,
 } from 'lucide-react'
 import ZoneGuard from '@/components/ZoneGuard'
 import type { Zone } from '@/types'
+import { saveOfflineIncident, getOfflineIncidents, deleteOfflineIncident } from '@/lib/offlineDb'
 
 const INCIDENT_TYPE_LABELS: Record<string, string> = {
   WASTE_ACCUMULATION: 'Acumulación de residuos',
@@ -64,6 +65,12 @@ export default function IncidentsPage() {
   const [geoLoading, setGeoLoading] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [offlineCount, setOfflineCount] = useState(0)
+
+  const loadOfflineCount = useCallback(async () => {
+    const list = await getOfflineIncidents()
+    setOfflineCount(list.length)
+  }, [])
 
   const fetchIncidents = useCallback(async () => {
     if (!accessToken) return
@@ -89,6 +96,74 @@ export default function IncidentsPage() {
 
   useEffect(() => { fetchIncidents() }, [fetchIncidents])
 
+  const syncOfflineIncidents = useCallback(async () => {
+    if (!accessToken) return
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      toast.error('No hay conexión a internet para sincronizar.')
+      return
+    }
+
+    try {
+      const offline = await getOfflineIncidents()
+      if (offline.length === 0) return
+
+      toast.info(`Sincronizando ${offline.length} reporte(s) guardado(s) localmente...`)
+      let successCount = 0
+
+      for (const item of offline) {
+        try {
+          let imageUrl = ''
+          if (item.base64Image) {
+            const resBlob = await fetch(item.base64Image)
+            const blob = await resBlob.blob()
+            const file = new File([blob], 'offline-image.jpg', { type: 'image/jpeg' })
+            imageUrl = await uploadToImgBB(file)
+          }
+
+          const payload: Record<string, unknown> = {
+            type: item.type,
+            description: item.description,
+          }
+          if (imageUrl) payload.imageUrl = imageUrl
+          if (item.address) payload.address = item.address
+          if (item.lat && item.lng) {
+            payload.lat = item.lat
+            payload.lng = item.lng
+          }
+
+          await api.post('/incidents', payload, accessToken)
+          await deleteOfflineIncident(item.id!)
+          successCount++
+        } catch (error) {
+          console.error('Error al sincronizar item offline:', error)
+        }
+      }
+
+      await loadOfflineCount()
+      if (successCount > 0) {
+        toast.success(`Sincronización exitosa: ${successCount} reporte(s) enviado(s).`)
+        fetchIncidents()
+      }
+    } catch (err) {
+      console.error('Fallo en la sincronización offline:', err)
+    }
+  }, [accessToken, fetchIncidents, loadOfflineCount])
+
+  useEffect(() => {
+    if (!accessToken) return
+    loadOfflineCount()
+
+    const handleOnline = () => {
+      toast.success('¡Conexión de red restablecida! Sincronizando reportes locales...')
+      syncOfflineIncidents()
+    }
+
+    window.addEventListener('online', handleOnline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [accessToken, loadOfflineCount, syncOfflineIncidents])
+
   function useMyLocation() {
     if (!navigator.geolocation) {
       toast.error('Tu navegador no soporta geolocalización')
@@ -112,15 +187,80 @@ export default function IncidentsPage() {
     )
   }
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  function compressImage(file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.75): Promise<File> {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (event) => {
+        const img = new Image()
+        img.src = event.target?.result as string
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width)
+              width = maxWidth
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height)
+              height = maxHeight
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                })
+                resolve(compressedFile)
+              } else {
+                resolve(file)
+              }
+            },
+            'image/jpeg',
+            quality
+          )
+        }
+        img.onerror = () => resolve(file)
+      }
+      reader.onerror = () => resolve(file)
+    })
+  }
+
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen no puede superar 5 MB')
-      return
+    
+    setUploadingImage(true)
+    try {
+      toast.info('Procesando y comprimiendo imagen localmente...')
+      const compressed = await compressImage(file)
+      
+      // Si el tamaño sigue siendo superior a 500KB, forzar una compresión más agresiva
+      let finalFile = compressed
+      if (compressed.size > 500 * 1024) {
+        finalFile = await compressImage(compressed, 800, 800, 0.55)
+      }
+      
+      setImageFile(finalFile)
+      setImagePreview(URL.createObjectURL(finalFile))
+      toast.success(`Imagen lista (${(finalFile.size / 1024).toFixed(1)} KB). Cumple con el límite de 500 KB.`)
+    } catch {
+      toast.error('Error al procesar la imagen')
+    } finally {
+      setUploadingImage(false)
     }
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
   }
 
   function removeImage() {
@@ -144,11 +284,55 @@ export default function IncidentsPage() {
     return json.data.url as string
   }
 
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = (error) => reject(error)
+    })
+  }
+
+  async function handleOfflineSave() {
+    try {
+      let base64Image = ''
+      if (imageFile) {
+        base64Image = await fileToBase64(imageFile)
+      }
+
+      await saveOfflineIncident({
+        type: form.type,
+        description: form.description,
+        address: form.address.trim() || undefined,
+        lat: form.lat ? parseFloat(form.lat) : undefined,
+        lng: form.lng ? parseFloat(form.lng) : undefined,
+        base64Image: base64Image || undefined
+      })
+
+      toast.success('Sin conexión o error de red. Reporte guardado localmente (Offline). Se enviará al recuperar conexión.')
+      setShowModal(false)
+      setForm(defaultForm)
+      removeImage()
+      loadOfflineCount()
+    } catch (err) {
+      console.error(err)
+      toast.error('No se pudo guardar el reporte localmente')
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!accessToken) return
 
     setSaving(true)
+
+    // Si detectamos explícitamente offline
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      await handleOfflineSave()
+      setSaving(false)
+      return
+    }
+
     try {
       let imageUrl = form.imageUrl.trim()
 
@@ -186,7 +370,13 @@ export default function IncidentsPage() {
       removeImage()
       fetchIncidents()
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Error al reportar')
+      // Si es un error de red (por ejemplo, TypeError: Failed to fetch)
+      const isNetworkError = !(err instanceof ApiError)
+      if (isNetworkError) {
+        await handleOfflineSave()
+      } else {
+        toast.error(err instanceof ApiError ? err.message : 'Error al reportar')
+      }
     } finally {
       setSaving(false)
     }
@@ -221,6 +411,29 @@ export default function IncidentsPage() {
   return (
     <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
     <div className="flex flex-col h-full">
+      {/* Banner de reportes offline pendientes */}
+      {offlineCount > 0 && (
+        <div className="mx-8 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm animate-pulse shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-100 p-2 rounded-lg text-amber-600">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900">Reportes locales pendientes ({offlineCount})</h4>
+              <p className="text-xs text-slate-500">
+                Tienes reportes guardados en la base de datos de tu dispositivo debido a la falta de conexión.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => syncOfflineIncidents()}
+            className="px-3.5 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors shadow-sm"
+          >
+            Sincronizar ahora
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -543,6 +756,27 @@ export default function IncidentsPage() {
                       />
                     </label>
                   )}
+                </div>
+
+                {/* Advertencia Ético-Legal (Privacidad) */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex gap-2">
+                  <AlertCircle size={16} className="shrink-0 text-blue-600 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Aviso de Privacidad (Ley N.º 29733):</span> Al capturar la fotografía, evite registrar rostros de personas o placas de vehículos ajenos para proteger los datos personales de terceros.
+                  </div>
+                </div>
+
+                {/* Consentimiento obligatorio */}
+                <div className="flex items-start gap-2 pt-2 border-t border-slate-100">
+                  <input
+                    type="checkbox"
+                    id="termsConsent"
+                    required
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <label htmlFor="termsConsent" className="text-xs text-slate-600 select-none leading-relaxed cursor-pointer">
+                    Doy mi consentimiento para el tratamiento de mis datos personales y autorizo el acceso a mi cámara y ubicación GPS con el único fin de procesar esta incidencia conforme a la <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-amber-600 underline">Política de Privacidad</a> de la Ley N.º 29733. *
+                  </label>
                 </div>
               </div>
 

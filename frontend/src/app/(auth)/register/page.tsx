@@ -38,6 +38,9 @@ const schema = z.object({
   address:  z.string().min(5, 'Mínimo 5 caracteres').max(200).trim(),
   district: z.string().min(1, 'Selecciona un distrito'),
   phone:    z.string().optional(),
+  consent:  z.literal(true, {
+    message: 'Debes aceptar los términos y condiciones de privacidad',
+  }),
 })
 
 type FormData = z.infer<typeof schema>
@@ -79,14 +82,14 @@ export default function RegisterPage() {
   }
 
   async function goToStep2() {
-    const valid = await trigger(['firstName', 'lastName', 'dni', 'email', 'password', 'address', 'district', 'phone'])
+    const valid = await trigger(['firstName', 'lastName', 'dni', 'email', 'password', 'address', 'district', 'phone', 'consent'])
     if (valid) setStep(2)
   }
 
   async function onSubmit(data: FormData) {
     try {
       const payload: Record<string, unknown> = { ...data }
-      if (zoneState.status === 'found') {
+      if (zoneState.status === 'found' || zoneState.status === 'invalid') {
         payload.lat = zoneState.lat
         payload.lng = zoneState.lng
       }
@@ -202,6 +205,20 @@ export default function RegisterPage() {
             <Field label="Teléfono (opcional)" error={errors.phone?.message}>
               <input type="tel" placeholder="987654321" inputMode="numeric" {...register('phone')} className={inputCls(!!errors.phone)} />
             </Field>
+
+            <div className="space-y-1 py-1">
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  {...register('consent')}
+                  className="mt-1 accent-green-600 rounded"
+                />
+                <span className="text-xs text-slate-500 leading-tight">
+                  Acepto el tratamiento de mis datos personales para la gestión del servicio de recolección de residuos sólidos, conforme a la <strong>Ley N.º 29733 (Ley de Protección de Datos Personales)</strong> y a la <Link href="/privacy" target="_blank" className="text-green-600 hover:underline">Política de Privacidad</Link>.
+                </span>
+              </label>
+              {errors.consent && <p className="text-xs text-red-600">{errors.consent.message}</p>}
+            </div>
 
             <button
               type="button"

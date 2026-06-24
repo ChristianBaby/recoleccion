@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
     "build": "tsc",
     "start": "prisma migrate deploy && node dist/index.js",
     "postinstall": "prisma generate",
@@ -32,10 +35,13 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.21",
     "@types/nodemailer": "^6.4.17",
+    "jest": "^30.4.2",
     "prisma": "^6.8.2",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"

@@ -194,3 +194,39 @@ function resetPasswordTemplate(firstName: string, link: string): string {
     </p>
   `)
 }
+
+export async function sendRouteAssignedEmail(
+  to: string,
+  firstName: string,
+  routeName: string,
+  startTime: string | null,
+  dayOfWeek: number[]
+) {
+  const daysStr = dayOfWeek.map((d) => {
+    const names = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    return names[d] ?? ''
+  }).join(', ')
+
+  await sendMail(
+    to,
+    'Nueva ruta de recolección asignada — EcoRutas Cusco',
+    baseTemplate(`
+      <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">¡Nueva ruta asignada! 🚛</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
+        Hola <strong>\${firstName}</strong>, se te ha asignado como operador para una nueva ruta de recolección:
+      </p>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #e2e8f0;">
+        <p style="margin:0 0 4px;font-size:13px;color:#64748b;">Nombre de la Ruta</p>
+        <p style="margin:0;font-size:18px;font-weight:700;color:#1e293b;">\${routeName}</p>
+        <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Horario de Inicio</p>
+        <p style="margin:0;font-size:16px;font-weight:600;color:#16a34a;">\${startTime ?? 'No definido'}</p>
+        <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Días de Recolección</p>
+        <p style="margin:0;font-size:14px;color:#475569;">\${daysStr}</p>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
+        Por favor ingresa a la aplicación en el horario indicado para iniciar tu ruta.
+      </p>
+    `)
+  )
+}
+
