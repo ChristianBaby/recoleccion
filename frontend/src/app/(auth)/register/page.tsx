@@ -37,7 +37,7 @@ const schema = z.object({
     .regex(/[0-9]/, 'Debe tener al menos un número'),
   address:  z.string().min(5, 'Mínimo 5 caracteres').max(200).trim(),
   district: z.string().min(1, 'Selecciona un distrito'),
-  phone:    z.string().optional(),
+  phone:    z.string().regex(/^\+?51?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)').optional().or(z.literal('')),
   consent:  z.literal(true, {
     message: 'Debes aceptar los términos y condiciones de privacidad',
   }),
