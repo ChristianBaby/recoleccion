@@ -11,6 +11,7 @@ import {
   getAccessToken,
   getDashboardPath,
   updateSavedUser,
+  isTokenExpired,
 } from '@/lib/auth'
 import type { AuthUser, ApiResponse } from '@/types'
 
@@ -40,13 +41,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const savedUser = getSavedUser()
-    const token = getAccessToken()
-    if (savedUser && token) {
-      setUser(savedUser)
-      setAccessToken(token)
+    const initAuth = async () => {
+      const savedUser = getSavedUser()
+      const token = getAccessToken()
+      const refreshToken = getRefreshToken()
+
+      if (savedUser && token) {
+        if (isTokenExpired(token) && refreshToken) {
+          try {
+            const res = await api.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
+              '/auth/refresh',
+              { refreshToken },
+            )
+            const data = res.data!
+            saveSession({ accessToken: data.accessToken, refreshToken: data.refreshToken }, savedUser)
+            setUser(savedUser)
+            setAccessToken(data.accessToken)
+          } catch {
+            clearSession()
+            setUser(null)
+            setAccessToken(null)
+          }
+        } else if (isTokenExpired(token) && !refreshToken) {
+          clearSession()
+          setUser(null)
+          setAccessToken(null)
+        } else {
+          setUser(savedUser)
+          setAccessToken(token)
+        }
+      }
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    initAuth()
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

@@ -268,7 +268,7 @@ async function main() {
   // ── Vehículos (Reducido a un máximo de 2) ──────────────────────────────────
   const vehiclesData = [
     { plate: 'CUZ-001', type: 'COMPACTOR'  as const, brand: 'Mercedes-Benz', model: 'Atego 1725', year: 2019, capacity: 10 },
-    { plate: 'CUZ-002', type: 'OPEN_TRUCK' as const, brand: 'Toyota',        model: 'Dyna 300',   year: 2018, capacity: 5  },
+    { plate: 'CUZ-002', type: 'COMPACTOR'  as const, brand: 'Mercedes-Benz', model: 'Atego 1725', year: 2020, capacity: 10 },
   ]
 
   // Limpieza selectiva e inteligente de vehículos obsoletos (Tanto en desarrollo como producción)
@@ -302,7 +302,7 @@ async function main() {
     vehiclesData.map((v) =>
       prisma.vehicle.upsert({
         where: { plate: v.plate },
-        update: {},
+        update: { type: v.type, brand: v.brand, model: v.model, year: v.year, capacity: v.capacity },
         create: { ...v, status: 'AVAILABLE', isActive: true },
       }),
     ),
