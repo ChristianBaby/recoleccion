@@ -191,12 +191,7 @@ export default function RegisterPage() {
               {password && <PasswordStrengthBar strength={getPasswordStrength(password)} />}
             </Field>
 
-            <Field label="Distrito" error={errors.district?.message}>
-              <select {...register('district')} className={inputCls(!!errors.district)}>
-                <option value="">Selecciona tu distrito</option>
-                {CUSCO_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </Field>
+            <input type="hidden" value="Poroy" {...register('district')} />
 
             <Field label="Dirección" error={errors.address?.message}>
               <input placeholder="Av. El Sol 123" {...register('address')} className={inputCls(!!errors.address)} />

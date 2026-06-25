@@ -291,19 +291,7 @@ export default function ZonesPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Distrito *</label>
-                    <select
-                      value={form.district}
-                      onChange={(e) => setForm({ ...form, district: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
-                        focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
+
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
