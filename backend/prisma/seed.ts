@@ -128,7 +128,10 @@ const COLORS = [
 
 
 async function main() {
-  const isProd = process.env.NODE_ENV === 'production'
+  // Modo seguro por defecto: la limpieza destructiva solo ocurre cuando
+  // NODE_ENV es explícitamente 'development'. Cualquier otro valor (production,
+  // no definido, etc.) ejecuta el seed en modo producción sin borrar datos.
+  const isProd = process.env.NODE_ENV !== 'development'
   console.log(`🌱 Iniciando seed de EcoRutas - Municipalidad de Poroy (Modo: ${isProd ? 'Producción' : 'Desarrollo'})...\n`)
 
   // ── Contraseñas ────────────────────────────────────────────────────────────
