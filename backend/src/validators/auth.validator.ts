@@ -25,7 +25,7 @@ export const registerSchema = z.object({
   password: passwordRules,
   phone: z
     .string()
-    .regex(/^\+?51?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)')
+    .regex(/^(\+?51)?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)')
     .optional()
     .or(z.literal('')),
   address: z

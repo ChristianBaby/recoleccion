@@ -8,7 +8,10 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 
 export const metadata: Metadata = {
   title: 'Sistema de Recolección — Gestión de Residuos',
-  description: 'Sistema Inteligente de Recolección de Residuos Sólidos Segregados — Cusco',
+  description: 'Sistema Inteligente de Recolección de Residuos Sólidos Segregados',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

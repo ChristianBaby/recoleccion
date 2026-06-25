@@ -29,10 +29,7 @@ const LeafletPolygonEditor = dynamic(() => import('@/components/LeafletPolygonEd
   ),
 })
 
-const DISTRICTS = [
-  'Cusco', 'San Jerónimo', 'San Sebastián', 'Santiago',
-  'Saylla', 'Ccorca', 'Poroy', 'Wanchaq',
-]
+const DISTRICTS = ['Poroy']
 
 const COLORS = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444',
@@ -48,7 +45,7 @@ interface FormState {
 }
 
 const defaultForm: FormState = {
-  name: '', description: '', district: '', color: '#22c55e', vertices: [],
+  name: '', description: '', district: 'Poroy', color: '#22c55e', vertices: [],
 }
 
 export default function ZonesPage() {

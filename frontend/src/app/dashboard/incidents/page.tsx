@@ -5,10 +5,6 @@ import { useAuth } from '@/context/AuthContext'
 import { api, ApiError } from '@/lib/api'
 import type { ApiResponse, Incident, IncidentStatus } from '@/types'
 import { toast } from 'sonner'
-import {
-  Plus, X, Loader2, AlertTriangle, MapPin, Copy, Check,
-  ChevronDown, ImagePlus, Trash2, Filter, AlertCircle,
-} from 'lucide-react'
 import ZoneGuard from '@/components/ZoneGuard'
 import type { Zone } from '@/types'
 import { saveOfflineIncident, getOfflineIncidents, deleteOfflineIncident } from '@/lib/offlineDb'
@@ -247,7 +243,6 @@ export default function IncidentsPage() {
       toast.info('Procesando y comprimiendo imagen localmente...')
       const compressed = await compressImage(file)
       
-      // Si el tamaño sigue siendo superior a 500KB, forzar una compresión más agresiva
       let finalFile = compressed
       if (compressed.size > 500 * 1024) {
         finalFile = await compressImage(compressed, 800, 800, 0.55)
@@ -326,7 +321,6 @@ export default function IncidentsPage() {
 
     setSaving(true)
 
-    // Si detectamos explícitamente offline
     if (typeof window !== 'undefined' && !navigator.onLine) {
       await handleOfflineSave()
       setSaving(false)
@@ -370,7 +364,6 @@ export default function IncidentsPage() {
       removeImage()
       fetchIncidents()
     } catch (err) {
-      // Si es un error de red (por ejemplo, TypeError: Failed to fetch)
       const isNetworkError = !(err instanceof ApiError)
       if (isNetworkError) {
         await handleOfflineSave()
@@ -410,241 +403,227 @@ export default function IncidentsPage() {
 
   return (
     <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
-    <div className="flex flex-col h-full">
-      {/* Banner de reportes offline pendientes */}
-      {offlineCount > 0 && (
-        <div className="mx-8 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm animate-pulse shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-100 p-2 rounded-lg text-amber-600">
-              <AlertTriangle size={18} />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900">Reportes locales pendientes ({offlineCount})</h4>
-              <p className="text-xs text-slate-500">
-                Tienes reportes guardados en la base de datos de tu dispositivo debido a la falta de conexión.
+      <div className="p-8 max-w-6xl mx-auto w-full">
+        {/* Banner de reportes offline pendientes */}
+        {offlineCount > 0 && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-pulse">
+            <div className="flex-1 min-w-0">
+              <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Reportes Offline</h4>
+              <h5 className="text-sm font-bold text-amber-950 mt-1">Sincronización pendiente ({offlineCount})</h5>
+              <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                Tienes reportes de incidencias guardados localmente debido a la falta de conexión a internet.
               </p>
             </div>
+            <button
+              onClick={() => syncOfflineIncidents()}
+              className="shrink-0 px-4 py-2 bg-amber-850 hover:bg-amber-900 text-white rounded text-xs font-bold tracking-wider uppercase transition-colors"
+            >
+              Sincronizar ahora
+            </button>
           </div>
-          <button
-            onClick={() => syncOfflineIncidents()}
-            className="px-3.5 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors shadow-sm"
-          >
-            Sincronizar ahora
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Header */}
-      <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-4">
+        {/* Header */}
+        <div className="mb-8 border-b border-slate-100 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <AlertTriangle size={18} className="text-amber-500" />
-              Incidencias
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              RF-11 · {incidents.length} incidencia(s)
-              {!isAdmin && ' · Incidencias de tu zona'}
+            <h1 className="text-3xl font-light text-slate-900 tracking-tight">Incidencias</h1>
+            <p className="text-slate-500 text-xs tracking-wider uppercase mt-1.5 font-bold">
+              Gestión de reportes y anomalías de recolección
+              {!isAdmin && ' · Tu zona de residencia'}
             </p>
           </div>
           {!isAdmin && (
             <button
               onClick={() => { setForm(defaultForm); setShowModal(true) }}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg
-                text-sm font-medium hover:bg-amber-600 transition-colors"
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
             >
-              <Plus size={16} /> Reportar incidencia
+              Reportar incidencia
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => { setForm(defaultForm); setShowModal(true) }}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
+            >
+              Registrar incidencia
             </button>
           )}
         </div>
 
-        {/* Admin zone filter */}
-        {isAdmin && (
-          <div className="flex items-center gap-3 mb-3">
-            <Filter size={14} className="text-slate-400" />
-            <select
-              value={filterZoneId}
-              onChange={(e) => setFilterZoneId(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm
-                focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-            >
-              <option value="">Todas las zonas</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>{z.name} — {z.district}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => { setForm(defaultForm); setShowModal(true) }}
-              className="ml-auto flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg
-                text-sm font-medium hover:bg-amber-600 transition-colors"
-            >
-              <Plus size={16} /> Registrar incidencia
-            </button>
+        {/* Filters and Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+          <div className="flex flex-wrap gap-1.5">
+            {(['ALL', ...STATUS_ORDER] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1.5 rounded text-xs font-bold tracking-wider uppercase transition-colors ${
+                  filterStatus === s
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {s === 'ALL' ? 'Todas' : STATUS_CONFIG[s].label}
+              </button>
+            ))}
           </div>
-        )}
 
-        {/* Status filter */}
-        <div className="flex gap-1.5">
-          {(['ALL', ...STATUS_ORDER] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filterStatus === s
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {s === 'ALL' ? 'Todas' : STATUS_CONFIG[s].label}
-            </button>
-          ))}
+          {/* Admin zone filter */}
+          {isAdmin && (
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Zona:</span>
+              <select
+                value={filterZoneId}
+                onChange={(e) => setFilterZoneId(e.target.value)}
+                className="w-full sm:w-auto border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
+              >
+                <option value="">Todas las zonas</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>{z.name} — {z.district}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto p-6">
+        {/* Incidents Table / List */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-slate-300" />
+          <div className="flex items-center justify-center py-20">
+            <span className="w-6 h-6 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
           </div>
         ) : displayedIncidents.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-center">
-            <AlertTriangle size={40} className="text-slate-200 mb-3" />
-            <p className="text-slate-400 text-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Sin Incidencias</p>
+            <p className="text-slate-500 text-sm">
               {filterStatus !== 'ALL'
-                ? `Sin incidencias con estado "${STATUS_CONFIG[filterStatus].label}"`
-                : 'Sin incidencias registradas'}
+                ? `No se encontraron incidencias con el estado "${STATUS_CONFIG[filterStatus].label}"`
+                : 'No hay incidencias registradas en el sistema.'}
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Código</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipo</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Descripción</th>
-                  {isAdmin && (
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ciudadano</th>
-                  )}
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Foto</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ubicación</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Fecha</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {displayedIncidents.map((inc) => {
-                  const status = STATUS_CONFIG[inc.status]
-                  return (
-                    <tr key={inc.id} className="hover:bg-slate-50">
-                      {/* Tracking code */}
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => copyCode(inc.trackingCode)}
-                          className="flex items-center gap-1 font-mono text-xs text-slate-500 hover:text-slate-900"
-                          title="Copiar código"
-                        >
-                          {inc.trackingCode.slice(0, 8)}…
-                          {copiedCode === inc.trackingCode
-                            ? <Check size={12} className="text-emerald-500" />
-                            : <Copy size={12} />}
-                        </button>
-                      </td>
-
-                      {/* Type */}
-                      <td className="px-4 py-3">
-                        <span className="text-slate-700 whitespace-nowrap">
-                          {INCIDENT_TYPE_LABELS[inc.type] ?? inc.type}
-                        </span>
-                      </td>
-
-                      {/* Description */}
-                      <td className="px-4 py-3 max-w-xs">
-                        <p className="text-slate-600 truncate" title={inc.description}>
-                          {inc.description}
-                        </p>
-                      </td>
-
-                      {/* Citizen (admin only) */}
-                      {isAdmin && (
-                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                          {inc.citizen
-                            ? `${inc.citizen.firstName} ${inc.citizen.lastName}`
-                            : '—'}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
+                    <th className="px-5 py-3.5">Código</th>
+                    <th className="px-5 py-3.5">Tipo</th>
+                    <th className="px-5 py-3.5">Descripción</th>
+                    {isAdmin && <th className="px-5 py-3.5">Ciudadano</th>}
+                    <th className="px-5 py-3.5">Foto</th>
+                    <th className="px-5 py-3.5">Ubicación</th>
+                    <th className="px-5 py-3.5">Fecha</th>
+                    <th className="px-5 py-3.5">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {displayedIncidents.map((inc) => {
+                    const status = STATUS_CONFIG[inc.status]
+                    return (
+                      <tr key={inc.id} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Tracking code */}
+                        <td className="px-5 py-4 font-mono font-bold text-slate-500">
+                          <button
+                            onClick={() => copyCode(inc.trackingCode)}
+                            className="hover:text-slate-900 transition-colors uppercase"
+                            title="Copiar código"
+                          >
+                            {inc.trackingCode.slice(0, 8)}…
+                            {copiedCode === inc.trackingCode && (
+                              <span className="text-emerald-700 ml-1 font-bold text-[9px] lowercase">(copiado)</span>
+                            )}
+                          </button>
                         </td>
-                      )}
 
-                      {/* Image */}
-                      <td className="px-4 py-3">
-                        {inc.imageUrl ? (
-                          <a href={inc.imageUrl} target="_blank" rel="noopener noreferrer">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={inc.imageUrl}
-                              alt="foto"
-                              className="w-10 h-10 object-cover rounded-lg border border-slate-200 hover:scale-150 transition-transform"
-                            />
-                          </a>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                        {/* Type */}
+                        <td className="px-5 py-4 font-semibold text-slate-800">
+                          {INCIDENT_TYPE_LABELS[inc.type] ?? inc.type}
+                        </td>
+
+                        {/* Description */}
+                        <td className="px-5 py-4 max-w-xs text-slate-650">
+                          <p className="truncate" title={inc.description}>
+                            {inc.description}
+                          </p>
+                        </td>
+
+                        {/* Citizen (admin only) */}
+                        {isAdmin && (
+                          <td className="px-5 py-4 text-slate-650 whitespace-nowrap">
+                            {inc.citizen
+                              ? `${inc.citizen.firstName} ${inc.citizen.lastName}`
+                              : '—'}
+                          </td>
                         )}
-                      </td>
 
-                      {/* Location */}
-                      <td className="px-4 py-3">
-                        {inc.address ? (
-                          <span className="text-slate-600 text-xs flex items-center gap-1">
-                            <MapPin size={11} />
-                            {inc.address}
-                          </span>
-                        ) : inc.lat && inc.lng ? (
-                          <span className="text-slate-400 text-xs font-mono">
-                            {inc.lat?.toFixed(4)}, {inc.lng?.toFixed(4)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">Sin ubicación</span>
-                        )}
-                      </td>
+                        {/* Image */}
+                        <td className="px-5 py-4">
+                          {inc.imageUrl ? (
+                            <a href={inc.imageUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={inc.imageUrl}
+                                alt="foto"
+                                className="w-9 h-9 object-cover rounded border border-slate-200 hover:scale-150 transition-all duration-200"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
 
-                      {/* Date */}
-                      <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
-                        {new Date(inc.createdAt).toLocaleDateString('es-PE', {
-                          day: '2-digit', month: 'short', year: 'numeric',
-                        })}
-                      </td>
+                        {/* Location */}
+                        <td className="px-5 py-4 text-slate-600 max-w-xs truncate">
+                          {inc.address ? (
+                            <span title={inc.address}>{inc.address}</span>
+                          ) : inc.lat && inc.lng ? (
+                            <span className="font-mono text-slate-400">
+                              {inc.lat?.toFixed(5)}, {inc.lng?.toFixed(5)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-350">Sin coordenadas</span>
+                          )}
+                        </td>
 
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        {isAdmin ? (
-                          <div className="relative">
-                            <select
-                              value={inc.status}
-                              onChange={(e) =>
-                                handleStatusChange(inc, e.target.value as IncidentStatus)
-                              }
-                              disabled={updatingId === inc.id}
-                              className={`appearance-none text-xs font-medium px-2 py-1 pr-6 rounded-full
-                                border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400
-                                disabled:opacity-50 ${status.cls}`}
-                            >
-                              {STATUS_ORDER.map((s) => (
-                                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-                              ))}
-                            </select>
-                            <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-current opacity-60" />
-                          </div>
-                        ) : (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.cls}`}>
-                            {status.label}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        {/* Date */}
+                        <td className="px-5 py-4 text-slate-400 whitespace-nowrap">
+                          {new Date(inc.createdAt).toLocaleDateString('es-PE', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                          })}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-5 py-4">
+                          {isAdmin ? (
+                            <div className="relative inline-block text-left">
+                              <select
+                                value={inc.status}
+                                onChange={(e) =>
+                                  handleStatusChange(inc, e.target.value as IncidentStatus)
+                                }
+                                disabled={updatingId === inc.id}
+                                className={`appearance-none text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 pr-8 rounded-full
+                                  border border-slate-200 bg-white cursor-pointer focus:outline-none focus:border-slate-800
+                                  disabled:opacity-50 transition-all ${status.cls}`}
+                              >
+                                {STATUS_ORDER.map((s) => (
+                                  <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+                                ))}
+                              </select>
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
+                            </div>
+                          ) : (
+                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${status.cls}`}>
+                              {status.label}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -652,11 +631,14 @@ export default function IncidentsPage() {
       {/* Modal: Reportar incidencia */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-              <h2 className="font-semibold text-slate-900">Reportar incidencia</h2>
-              <button onClick={() => { setShowModal(false); removeImage() }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                <X size={18} />
+              <h2 className="font-semibold text-slate-900 text-sm">REPORTAR INCIDENCIA</h2>
+              <button 
+                onClick={() => { setShowModal(false); removeImage() }} 
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-400 hover:text-slate-900 uppercase transition-colors"
+              >
+                Cerrar
               </button>
             </div>
 
@@ -664,12 +646,12 @@ export default function IncidentsPage() {
               <div className="px-6 py-5 space-y-4">
                 {/* Type */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Tipo de incidencia *</label>
+                  <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">Tipo de incidencia *</label>
                   <select
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                     required
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 bg-white transition-colors"
                   >
                     {Object.entries(INCIDENT_TYPE_LABELS).map(([val, label]) => (
                       <option key={val} value={val}>{label}</option>
@@ -679,7 +661,7 @@ export default function IncidentsPage() {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                     Descripción * <span className="font-normal text-slate-400">(mínimo 10 caracteres)</span>
                   </label>
                   <textarea
@@ -688,66 +670,61 @@ export default function IncidentsPage() {
                     required
                     rows={3}
                     placeholder="Describe el problema con el mayor detalle posible..."
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 resize-none transition-colors"
                   />
                 </div>
 
                 {/* Location */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-medium text-slate-700">
-                      <MapPin size={11} className="inline mr-1" />Ubicación
-                    </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Ubicación</label>
                     <button
                       type="button"
                       onClick={useMyLocation}
                       disabled={geoLoading}
-                      className="text-xs text-amber-600 hover:underline flex items-center gap-1 disabled:opacity-50"
+                      className="text-[10px] font-bold tracking-wider text-amber-700 hover:text-amber-900 uppercase transition-colors disabled:opacity-50"
                     >
-                      {geoLoading
-                        ? <><Loader2 size={11} className="animate-spin" /> Obteniendo...</>
-                        : 'Usar mi ubicación'}
+                      {geoLoading ? 'Obteniendo GPS...' : 'Usar mi ubicación GPS'}
                     </button>
                   </div>
                   <input
                     type="text"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="Dirección o referencia (Ej: Av. El Sol 123, Cusco)"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 mb-2"
+                    placeholder="Dirección o referencia (Ej: Av. El Sol 123)"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 mb-2 transition-colors"
                   />
                   {(form.lat || form.lng) && (
-                    <p className="text-xs text-slate-400 font-mono">
-                      GPS: {form.lat}, {form.lng}
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Coordenadas: {form.lat}, {form.lng}
                     </p>
                   )}
                 </div>
 
                 {/* Image upload */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Foto <span className="font-normal text-slate-400">(opcional, máx. 5 MB)</span>
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+                    Foto <span className="font-normal text-slate-400">(opcional, máx. 500 KB)</span>
                   </label>
                   {imagePreview ? (
-                    <div className="relative rounded-lg overflow-hidden border border-slate-200">
+                    <div className="relative rounded overflow-hidden border border-slate-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={imagePreview} alt="Preview" className="w-full max-h-40 object-cover" />
                       <button
                         type="button"
                         onClick={removeImage}
-                        className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-lg text-red-500
-                          hover:bg-white transition-colors"
+                        className="absolute top-2 right-2 px-2.5 py-1 bg-white/95 rounded border border-slate-250 text-red-600 hover:text-red-700 text-[10px] font-bold tracking-wider uppercase transition-colors"
                         title="Eliminar imagen"
                       >
-                        <Trash2 size={14} />
+                        Quitar foto
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center gap-2 w-full h-24
-                      border-2 border-dashed border-slate-300 rounded-lg cursor-pointer
-                      hover:border-amber-400 hover:bg-amber-50 transition-colors">
-                      <ImagePlus size={20} className="text-slate-400" />
-                      <span className="text-xs text-slate-400">Click para adjuntar foto</span>
+                    <label className="flex flex-col items-center justify-center gap-1.5 w-full h-24
+                      border border-dashed border-slate-300 rounded cursor-pointer
+                      hover:border-slate-850 hover:bg-slate-50 transition-colors">
+                      <span className="text-[11px] font-bold tracking-wider text-slate-550 uppercase">Adjuntar foto</span>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider">Haga clic para seleccionar archivo</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -759,23 +736,21 @@ export default function IncidentsPage() {
                 </div>
 
                 {/* Advertencia Ético-Legal (Privacidad) */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex gap-2">
-                  <AlertCircle size={16} className="shrink-0 text-blue-600 mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Aviso de Privacidad (Ley N.º 29733):</span> Al capturar la fotografía, evite registrar rostros de personas o placas de vehículos ajenos para proteger los datos personales de terceros.
-                  </div>
+                <div className="bg-slate-50 border border-slate-200 rounded p-4 text-[10px] text-slate-600 leading-relaxed">
+                  <span className="font-bold uppercase tracking-wider text-slate-900 block mb-1">Aviso de Privacidad (Ley N.º 29733):</span>
+                  Al capturar la fotografía, evite registrar rostros de personas o placas de vehículos ajenos para proteger los datos personales de terceros.
                 </div>
 
                 {/* Consentimiento obligatorio */}
-                <div className="flex items-start gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
                   <input
                     type="checkbox"
                     id="termsConsent"
                     required
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    className="mt-1 h-4 w-4 text-amber-600 border-slate-350 rounded focus:ring-amber-500 cursor-pointer accent-amber-600"
                   />
-                  <label htmlFor="termsConsent" className="text-xs text-slate-600 select-none leading-relaxed cursor-pointer">
-                    Doy mi consentimiento para el tratamiento de mis datos personales y autorizo el acceso a mi cámara y ubicación GPS con el único fin de procesar esta incidencia conforme a la <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-amber-600 underline">Política de Privacidad</a> de la Ley N.º 29733. *
+                  <label htmlFor="termsConsent" className="text-[10px] text-slate-550 select-none leading-relaxed cursor-pointer font-medium">
+                    Doy mi consentimiento para el tratamiento de mis datos personales y autorizo el acceso a mi ubicación GPS con el único fin de procesar esta incidencia conforme a la <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-amber-700 hover:text-amber-900 hover:underline font-bold inline-flex items-center gap-1">Política de Privacidad<svg className="w-3 h-3 inline-block shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg><span className="sr-only">(se abre en una nueva pestaña)</span></a> de la Ley N.º 29733. *
                   </label>
                 </div>
               </div>
@@ -784,24 +759,25 @@ export default function IncidentsPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
+                  className="px-4 py-2 text-xs font-bold tracking-wider text-slate-600 border border-slate-200 rounded hover:bg-slate-50 uppercase transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || uploadingImage}
-                  className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center gap-2"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-amber-650 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
                 >
-                  {(saving || uploadingImage) && <Loader2 size={14} className="animate-spin" />}
-                  {uploadingImage ? 'Subiendo imagen...' : saving ? 'Enviando...' : 'Enviar reporte'}
+                  {saving || uploadingImage ? (
+                    <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-2" />
+                  ) : null}
+                  {uploadingImage ? 'Subiendo...' : saving ? 'Enviando...' : 'Enviar reporte'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
     </ZoneGuard>
   )
 }

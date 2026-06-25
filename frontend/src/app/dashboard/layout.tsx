@@ -3,29 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import {
-  LayoutDashboard,
-  MapPin,
-  Route,
-  Truck,
-  LogOut,
-  ChevronRight,
-  Leaf,
-  Recycle,
-  AlertTriangle,
-  Activity,
-  CalendarDays,
-  BarChart2,
-  BookOpen,
-  Users,
-  UserCircle,
-} from 'lucide-react'
 import ProximityAlertListener from '@/components/ProximityAlertListener'
 
 interface NavItem {
   href: string
   label: string
-  icon: React.ReactNode
   roles: string[]
 }
 
@@ -33,73 +15,61 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard',
     label: 'Inicio',
-    icon: <LayoutDashboard size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
   },
   {
     href: '/dashboard/profile',
     label: 'Mi Perfil',
-    icon: <UserCircle size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
   },
   {
     href: '/dashboard/zones',
     label: 'Zonas',
-    icon: <MapPin size={18} />,
     roles: ['ADMIN', 'OPERATOR'],
   },
   {
     href: '/dashboard/routes',
     label: 'Rutas',
-    icon: <Route size={18} />,
     roles: ['ADMIN', 'OPERATOR'],
   },
   {
     href: '/dashboard/vehicles',
     label: 'Vehículos',
-    icon: <Truck size={18} />,
     roles: ['ADMIN'],
   },
   {
     href: '/dashboard/waste-types',
     label: 'Residuos',
-    icon: <Recycle size={18} />,
     roles: ['ADMIN', 'CITIZEN', 'OPERATOR'],
   },
   {
     href: '/dashboard/learn',
     label: 'Aprende a segregar',
-    icon: <BookOpen size={18} />,
     roles: ['ADMIN', 'CITIZEN', 'OPERATOR'],
   },
   {
     href: '/dashboard/incidents',
     label: 'Incidencias',
-    icon: <AlertTriangle size={18} />,
     roles: ['ADMIN', 'CITIZEN'],
   },
   {
     href: '/dashboard/tracking',
     label: 'Rastreo',
-    icon: <Activity size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
   },
   {
     href: '/dashboard/schedules',
     label: 'Horarios',
-    icon: <CalendarDays size={18} />,
     roles: ['ADMIN', 'OPERATOR', 'CITIZEN'],
   },
   {
     href: '/dashboard/users',
     label: 'Usuarios',
-    icon: <Users size={18} />,
     roles: ['ADMIN'],
   },
   {
     href: '/dashboard/reports',
     label: 'Reportes',
-    icon: <BarChart2 size={18} />,
     roles: ['ADMIN'],
   },
 ]
@@ -117,15 +87,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className="w-60 bg-white border-r border-slate-200 flex flex-col shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-slate-100">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-            <Leaf size={16} className="text-white" />
-          </div>
-          <span className="font-semibold text-slate-900 text-sm">Gestión de Residuos</span>
+        <div className="flex flex-col px-5 py-5 border-b border-slate-100">
+          <span className="text-[10px] tracking-widest text-slate-400 font-bold block leading-none mb-1">
+            SISTEMA DE
+          </span>
+          <span className="text-sm font-black text-slate-900 tracking-wide block leading-none">
+            RECOLECCIÓN
+          </span>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
           {visibleItems.map((item) => {
             const isActive =
               item.href === '/dashboard'
@@ -136,18 +108,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`group flex items-center justify-between py-2.5 transition-all relative ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'text-teal-900 font-bold px-5'
+                    : 'text-slate-500 hover:text-slate-900 px-5 font-normal'
                 }`}
               >
-                <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>
-                  {item.icon}
-                </span>
-                {item.label}
+                {/* Indicador de barra izquierda para elemento activo */}
                 {isActive && (
-                  <ChevronRight size={14} className="ml-auto text-emerald-500" />
+                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-teal-700" />
+                )}
+                <span className="text-xs uppercase tracking-wider">{item.label}</span>
+                {isActive && (
+                  <span className="text-[10px] text-teal-600 font-semibold tracking-normal lowercase">activo</span>
                 )}
               </Link>
             )
@@ -155,32 +128,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User footer */}
-        <div className="border-t border-slate-100 p-3">
-          <div className="flex items-center gap-3 px-2 py-2 mb-1">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-xs shrink-0">
+        <div className="border-t border-slate-100 p-4">
+          <div className="flex items-center gap-3 px-1 py-1 mb-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-xs shrink-0">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-900 truncate">
+              <p className="text-xs font-semibold text-slate-900 truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-slate-400 truncate">{user?.role}</p>
+              <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase truncate">{user?.role === 'CITIZEN' ? 'Ciudadano' : user?.role === 'OPERATOR' ? 'Operador' : 'Administrador'}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-500
-              hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="w-full text-left py-2 px-1 text-xs font-bold tracking-widest text-slate-400
+              hover:text-red-600 transition-colors uppercase"
           >
-            <LogOut size={16} />
             Cerrar sesión
           </button>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        {children}
+      <main className="flex-1 overflow-auto flex flex-col justify-between bg-slate-50">
+        <div className="flex-1 flex flex-col">
+          {/* Header Superior */}
+          <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shrink-0">
+            <div className="text-xs text-slate-400 font-medium capitalize">
+              {new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold tracking-wider px-2.5 py-1 bg-slate-100 text-slate-600 rounded uppercase">
+                {user?.role === 'CITIZEN' ? 'Ciudadano' : user?.role === 'OPERATOR' ? 'Operador' : 'Administrador'}
+              </span>
+            </div>
+          </header>
+
+          <div className="flex-1">
+            {children}
+          </div>
+        </div>
+
+        {/* Footer Inferior */}
+        <footer className="border-t border-slate-200 bg-white px-8 py-4 text-center text-[10px] text-slate-400 font-semibold tracking-wider uppercase shrink-0">
+          <span>Gobierno Municipal — Sistema de Recolección — © {new Date().getFullYear()}</span>
+        </footer>
       </main>
 
       {/* RF-12: Alerta de proximidad del camión (solo ciudadanos) */}

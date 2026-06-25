@@ -21,10 +21,7 @@ const LeafletRegisterMap = dynamic(() => import('@/components/LeafletRegisterMap
   ),
 })
 
-const CUSCO_DISTRICTS = [
-  'Cusco', 'San Sebastián', 'San Jerónimo', 'Santiago', 'Wanchaq',
-  'Saylla', 'Ccorca', 'Poroy',
-]
+const CUSCO_DISTRICTS = ['Poroy']
 
 const schema = z.object({
   firstName: z.string().min(2, 'Mínimo 2 caracteres').max(50).trim(),
@@ -37,7 +34,7 @@ const schema = z.object({
     .regex(/[0-9]/, 'Debe tener al menos un número'),
   address:  z.string().min(5, 'Mínimo 5 caracteres').max(200).trim(),
   district: z.string().min(1, 'Selecciona un distrito'),
-  phone:    z.string().regex(/^\+?51?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)').optional().or(z.literal('')),
+  phone:    z.string().regex(/^(\+?51)?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)').optional().or(z.literal('')),
   consent:  z.literal(true, {
     message: 'Debes aceptar los términos y condiciones de privacidad',
   }),
@@ -61,6 +58,9 @@ export default function RegisterPage() {
 
   const { register, handleSubmit, watch, trigger, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      district: 'Poroy',
+    }
   })
 
   const password = watch('password', '')
@@ -117,7 +117,7 @@ export default function RegisterPage() {
             <strong className="text-slate-700">{registeredEmail}</strong>
           </p>
           {zoneState.status === 'found' && (
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 text-teal-800 rounded-full text-xs font-medium">
               <MapPin size={12} /> Zona asignada: {zoneState.zone.name}
             </div>
           )}
@@ -199,7 +199,7 @@ export default function RegisterPage() {
             </Field>
 
             <Field label="Dirección" error={errors.address?.message}>
-              <input placeholder="Av. El Sol 123, Cusco" {...register('address')} className={inputCls(!!errors.address)} />
+              <input placeholder="Av. El Sol 123" {...register('address')} className={inputCls(!!errors.address)} />
             </Field>
 
             <Field label="Teléfono (opcional)" error={errors.phone?.message}>
@@ -207,15 +207,15 @@ export default function RegisterPage() {
             </Field>
 
             <div className="space-y-1">
-              <div className="bg-green-50/40 border border-green-100 rounded-xl p-3.5 transition-all hover:bg-green-50/60">
+              <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-3.5 transition-all hover:bg-teal-50/60">
                 <label className="flex items-start gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     {...register('consent')}
-                    className="mt-1 w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500 accent-green-600 cursor-pointer"
+                    className="mt-1 w-4 h-4 text-teal-700 border-slate-300 rounded focus:ring-teal-600 accent-teal-700 cursor-pointer"
                   />
                   <span className="text-xs text-slate-600 leading-relaxed">
-                    Acepto el tratamiento de mis datos personales para la gestión del servicio de recolección de residuos, conforme a la <strong>Ley N.º 29733 (Ley de Protección de Datos Personales)</strong> y a la <Link href="/privacy" target="_blank" className="text-green-600 hover:underline font-semibold">Política de Privacidad</Link>.
+                    Acepto el tratamiento de mis datos personales para la gestión del servicio de recolección de residuos, conforme a la <strong>Ley N.º 29733 (Ley de Protección de Datos Personales)</strong> y a la <Link href="/privacy" target="_blank" className="text-teal-700 hover:underline font-semibold inline-flex items-center gap-1">Política de Privacidad<svg className="w-3 h-3 inline-block shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg><span className="sr-only">(se abre en una nueva pestaña)</span></Link>.
                   </span>
                 </label>
               </div>
@@ -225,8 +225,8 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={goToStep2}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600
-                hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-sm"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
+                hover:bg-teal-800 text-white font-semibold rounded-lg transition-colors text-sm"
             >
               Siguiente — Seleccionar zona <ArrowRight size={16} />
             </button>
@@ -238,11 +238,11 @@ export default function RegisterPage() {
           <div className="space-y-3">
             {/* Zone status banner */}
             {zoneState.status === 'found' && (
-              <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm">
-                <MapPin size={16} className="text-emerald-600 shrink-0" />
+              <div className="flex items-center gap-2 p-3 bg-teal-50 border border-teal-200 rounded-lg text-sm">
+                <MapPin size={16} className="text-teal-700 shrink-0" />
                 <div>
-                  <p className="font-semibold text-emerald-800">Zona detectada: {zoneState.zone.name}</p>
-                  <p className="text-emerald-600 text-xs">{zoneState.zone.district}</p>
+                  <p className="font-semibold text-teal-900">Zona detectada: {zoneState.zone.name}</p>
+                  <p className="text-teal-700 text-xs">{zoneState.zone.district}</p>
                 </div>
                 <div className="ml-auto w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: zoneState.zone.color }} />
               </div>
@@ -284,8 +284,8 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600
-                  hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-lg
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
+                  hover:bg-teal-800 disabled:bg-teal-400 text-white font-semibold rounded-lg
                   transition-colors text-sm"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
@@ -302,7 +302,7 @@ export default function RegisterPage() {
 
       <p className="text-center text-sm text-slate-500">
         ¿Ya tienes cuenta?{' '}
-        <Link href="/login" className="text-green-600 hover:text-green-700 font-medium">Inicia sesión</Link>
+        <Link href="/login" className="text-teal-700 hover:text-teal-800 font-medium">Inicia sesión</Link>
       </p>
     </div>
   )
@@ -312,8 +312,8 @@ export default function RegisterPage() {
 
 function inputCls(hasError: boolean) {
   return `w-full px-4 py-2.5 rounded-lg border text-sm transition-colors outline-none
-    focus:ring-2 focus:ring-green-500 focus:border-transparent
-    ${hasError ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'}`
+    focus:ring-2 focus:ring-teal-600 focus:border-transparent
+    \${hasError ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'}`
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
@@ -337,7 +337,7 @@ function getPasswordStrength(p: string) {
 
 function PasswordStrengthBar({ strength }: { strength: number }) {
   const labels = ['', 'Débil', 'Regular', 'Buena', 'Excelente']
-  const colors = ['', 'bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500']
+  const colors = ['', 'bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-teal-600']
   return (
     <div className="mt-1.5 space-y-1">
       <div className="flex gap-1">
@@ -345,7 +345,7 @@ function PasswordStrengthBar({ strength }: { strength: number }) {
           <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= strength ? colors[strength] : 'bg-slate-200'}`} />
         ))}
       </div>
-      <p className={`text-xs ${strength >= 3 ? 'text-green-600' : 'text-slate-400'}`}>{labels[strength]}</p>
+      <p className={`text-xs ${strength >= 3 ? 'text-teal-700' : 'text-slate-400'}`}>{labels[strength]}</p>
     </div>
   )
 }
