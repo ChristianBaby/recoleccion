@@ -5,7 +5,10 @@ import { prisma } from '../config/prisma'
 import { setupTrackingHandlers } from './tracking'
 
 export function setupSocketServer(httpServer: HttpServer, frontendUrl: string): Server {
-  const allowedOrigins = frontendUrl.split(',').map((u) => u.trim()).filter(Boolean)
+  const allowedOrigins = frontendUrl
+    .split(',')
+    .map((u) => u.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean)
   const io = new Server(httpServer, {
     cors: { origin: allowedOrigins, credentials: true },
   })

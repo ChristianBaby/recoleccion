@@ -18,7 +18,11 @@ app.set('trust proxy', 1)
 // ─── Seguridad ────────────────────────────────────────────────────────────────
 app.use(helmet())
 
-const allowedOrigins = env.frontendUrl.split(',').map((u) => u.trim()).filter(Boolean)
+const allowedOrigins = env.frontendUrl
+  .split(',')
+  .map((u) => u.trim().replace(/^['"]|['"]$/g, ''))
+  .filter(Boolean)
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
