@@ -24,7 +24,11 @@ const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
   .filter(Boolean)
 
 function isAllowedOrigin(origin: string) {
-  return allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')
+  return (
+    allowedOrigins.includes(origin) ||
+    origin.endsWith('.vercel.app') ||
+    origin.endsWith('.ecosdelseo.com')
+  )
 }
 
 app.use(cors({
