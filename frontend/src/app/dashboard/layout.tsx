@@ -165,8 +165,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User footer */}
-        <div className="border-t border-slate-100 p-4">
-          <p className="text-[9px] text-center font-bold text-slate-400 tracking-widest uppercase">
+        <div className="border-t border-slate-100 p-4 flex flex-col gap-2 shrink-0">
+          <button
+            onClick={logout}
+            className="w-full text-left py-2 px-1.5 text-xs font-bold tracking-widest text-slate-400
+              hover:text-red-650 active:scale-95 transition-all uppercase flex items-center gap-2 group/logout"
+          >
+            <LogOut size={14} className="text-slate-400 group-hover/logout:text-red-500 transition-colors" />
+            <span>Cerrar sesión</span>
+          </button>
+          <p className="text-[9px] text-center font-bold text-slate-350 tracking-widest uppercase mt-1">
             Sistema RSS
           </p>
         </div>
