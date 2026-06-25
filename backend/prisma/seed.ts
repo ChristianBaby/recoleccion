@@ -182,24 +182,38 @@ async function main() {
   )
   console.log('✅ Operadores creados/actualizados:', operators.length)
 
-  // ── Vehículos ──────────────────────────────────────────────────────────────
+  // ── Vehículos (Reducido a un máximo de 2) ──────────────────────────────────
   const vehiclesData = [
     { plate: 'CUZ-001', type: 'COMPACTOR'  as const, brand: 'Mercedes-Benz', model: 'Atego 1725', year: 2019, capacity: 10 },
-    { plate: 'CUZ-002', type: 'COMPACTOR'  as const, brand: 'Mercedes-Benz', model: 'Atego 1725', year: 2020, capacity: 10 },
-    { plate: 'CUZ-003', type: 'COMPACTOR'  as const, brand: 'Volvo',         model: 'FM 380',     year: 2018, capacity: 12 },
-    { plate: 'CUZ-004', type: 'COMPACTOR'  as const, brand: 'Volvo',         model: 'FM 380',     year: 2021, capacity: 12 },
-    { plate: 'CUZ-005', type: 'COMPACTOR'  as const, brand: 'Scania',        model: 'P 360',      year: 2019, capacity: 14 },
-    { plate: 'CUZ-006', type: 'COMPACTOR'  as const, brand: 'Scania',        model: 'P 360',      year: 2022, capacity: 14 },
-    { plate: 'CUZ-007', type: 'OPEN_TRUCK' as const, brand: 'Toyota',        model: 'Dyna 300',   year: 2017, capacity: 5  },
-    { plate: 'CUZ-008', type: 'OPEN_TRUCK' as const, brand: 'Toyota',        model: 'Dyna 300',   year: 2018, capacity: 5  },
-    { plate: 'CUZ-009', type: 'OPEN_TRUCK' as const, brand: 'Isuzu',         model: 'NPR 75L',    year: 2019, capacity: 6  },
-    { plate: 'CUZ-010', type: 'OPEN_TRUCK' as const, brand: 'Isuzu',         model: 'NPR 75L',    year: 2020, capacity: 6  },
-    { plate: 'CUZ-011', type: 'OPEN_TRUCK' as const, brand: 'Mitsubishi',    model: 'Canter FE',  year: 2021, capacity: 4  },
-    { plate: 'CUZ-012', type: 'MINI_TRUCK' as const, brand: 'Kia',           model: 'K2500',      year: 2020, capacity: 2  },
-    { plate: 'CUZ-013', type: 'MINI_TRUCK' as const, brand: 'Kia',           model: 'K2500',      year: 2021, capacity: 2  },
-    { plate: 'CUZ-014', type: 'MINI_TRUCK' as const, brand: 'Hyundai',       model: 'HR',         year: 2019, capacity: 1.5},
-    { plate: 'CUZ-015', type: 'MINI_TRUCK' as const, brand: 'Hyundai',       model: 'HR',         year: 2022, capacity: 1.5},
+    { plate: 'CUZ-002', type: 'OPEN_TRUCK' as const, brand: 'Toyota',        model: 'Dyna 300',   year: 2018, capacity: 5  },
   ]
+
+  // Limpieza selectiva e inteligente de vehículos obsoletos (Tanto en desarrollo como producción)
+  const officialPlates = vehiclesData.map(v => v.plate)
+
+  // 1. Desvincular vehículos de las rutas activas
+  await prisma.route.updateMany({
+    where: { vehicle: { plate: { notIn: officialPlates } } },
+    data: { vehicleId: null }
+  })
+
+  // 2. Eliminar tracks GPS de ejecuciones asociadas a vehículos obsoletos
+  await prisma.gpsTrack.deleteMany({
+    where: { routeExecution: { vehicle: { plate: { notIn: officialPlates } } } }
+  })
+
+  // 3. Eliminar ejecuciones de rutas asociadas a vehículos obsoletos
+  await prisma.routeExecution.deleteMany({
+    where: { vehicle: { plate: { notIn: officialPlates } } }
+  })
+
+  // 4. Eliminar los vehículos obsoletos
+  const deleteVehiclesRes = await prisma.vehicle.deleteMany({
+    where: { plate: { notIn: officialPlates } }
+  })
+  if (deleteVehiclesRes.count > 0) {
+    console.log(`🧹 Limpiados ${deleteVehiclesRes.count} vehículos obsoletos de la base de datos.`)
+  }
 
   const vehicles = await Promise.all(
     vehiclesData.map((v) =>
