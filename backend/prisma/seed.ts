@@ -8,9 +8,8 @@ const ADMIN_PASSWORD = 'Admin2024@'
 const OPERATOR_PASSWORD = 'Operador2024@'
 const SALT_ROUNDS = 12
 
-// Lista oficial de 26 zonas operativas de Poroy
+// Lista oficial de 15 zonas operativas de Poroy (Zonas Iniciales)
 const POROY_ZONES_DATA = [
-  // Iniciales (1 al 15)
   { name: 'Poroy Centro',          type: 'Zona urbana principal' },
   { name: 'Cruz Verde',            type: 'Sector / APV' },
   { name: 'Cruz Verde Quehuepay',   type: 'Barrio / sector' },
@@ -25,19 +24,7 @@ const POROY_ZONES_DATA = [
   { name: 'Bella Esperanza',       type: 'APV' },
   { name: 'Ollachayoqpampa',       type: 'APV / sector' },
   { name: 'Ccollayocpata',         type: 'APV / sector' },
-  { name: 'Chuñunapampa',          type: 'APV / sector' },
-  // Extendidas (16 al 26)
-  { name: 'Huampar',               type: 'Centro poblado / comunidad' },
-  { name: 'Chinchaysuyo',          type: 'Centro poblado / comunidad' },
-  { name: 'Sencca Quispihuara',    type: 'Comunidad / centro poblado cercano' },
-  { name: 'Huarahuaylla Ticahuerta',type: 'Comunidad / centro poblado' },
-  { name: 'Rayampata',             type: 'Centro poblado' },
-  { name: 'Yanamayo',              type: 'Centro poblado' },
-  { name: 'Queñuapata',            type: 'Centro poblado' },
-  { name: 'Llanumpata',            type: 'Centro poblado' },
-  { name: 'Urbambillayoc',         type: 'Centro poblado' },
-  { name: 'Chulluncoy',            type: 'Centro poblado' },
-  { name: 'Paucarpata',            type: 'Centro poblado' }
+  { name: 'Chuñunapampa',          type: 'APV / sector' }
 ]
 
 const COLORS = [
