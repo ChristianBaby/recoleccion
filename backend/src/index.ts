@@ -37,24 +37,6 @@ app.use(cors({
   credentials: true,
 }))
 
-// Rate limiting global — OPTIONS siempre pasa (preflight CORS)
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 2000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.method === 'OPTIONS',
-  handler: (req, res) => {
-    const origin = req.headers.origin as string | undefined
-    if (origin && isAllowedOrigin(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin)
-      res.setHeader('Vary', 'Origin')
-      res.setHeader('Access-Control-Allow-Credentials', 'true')
-    }
-    res.status(429).json({ success: false, message: 'Demasiadas solicitudes. Intenta en 15 minutos.' })
-  },
-}))
-
 // Rate limiting estricto para auth
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
