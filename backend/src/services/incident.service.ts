@@ -24,13 +24,16 @@ export async function listIncidents(
     })
   }
 
-  // Ciudadano/Operador: ver todas las incidencias de su zona
+  // Ciudadano/Operador: ver incidencias de su zona + las de creadores con rol ADMIN u OPERATOR
   const me = await prisma.user.findUnique({ where: { id: userId }, select: { zoneId: true } })
-  if (!me?.zoneId) return [] // Sin zona = sin incidencias
+  const zoneQuery = me?.zoneId ? { citizen: { zoneId: me.zoneId } } : null
 
   return prisma.incident.findMany({
     where: {
-      citizen: { zoneId: me.zoneId },
+      OR: [
+        ...(zoneQuery ? [zoneQuery] : []),
+        { citizen: { role: { in: ['ADMIN', 'OPERATOR'] } } }
+      ],
       ...(filters?.status && { status: filters.status as any }),
     },
     include: {
