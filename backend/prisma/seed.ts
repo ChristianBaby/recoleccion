@@ -8,17 +8,91 @@ const ADMIN_PASSWORD = 'Admin2024@'
 const OPERATOR_PASSWORD = 'Operador2024@'
 const SALT_ROUNDS = 12
 
-// Lista oficial de 9 zonas georreferenciadas del distrito de Poroy
+// 9 zonas del distrito de Poroy con polígonos reales no superpuestos
+// Divisores: lng -72.033 | -72.021 | -72.013 | -72.004 / lat -13.493 | -13.503 | -13.508
+// Formato GeoJSON: [lng, lat][] — anillo cerrado
 const POROY_ZONES_DATA = [
-  { name: 'Poroy Centro',            lat: -13.49553, lng: -72.04360, radius: 600, type: 'Zona principal / pueblo' },
-  { name: 'Ticahuerta',              lat: -13.48975, lng: -72.04266, radius: 500, type: 'Zona cercana a Poroy Centro' },
-  { name: 'Cruz Verde de Quehuepay', lat: -13.50626, lng: -72.00906, radius: 600, type: 'Zona urbana / barrio' },
-  { name: 'APV Las Rocas',           lat: -13.50967, lng: -72.00722, radius: 500, type: 'Zona urbana cercana a Cruz Verde' },
-  { name: 'Sencca Quispihura',       lat: -13.49954, lng: -72.00772, radius: 650, type: 'Zona urbana / barrio' },
-  { name: 'Huarahuaylla',            lat: -13.50200, lng: -72.01853, radius: 500, type: 'Zona intermedia' },
-  { name: 'Huampar',                 lat: -13.50267, lng: -72.02273, radius: 550, type: 'Centro poblado / comunidad' },
-  { name: 'Chinchaysuyo',            lat: -13.50331, lng: -72.02323, radius: 550, type: 'Centro poblado / comunidad' },
-  { name: 'Huasahuara',              lat: -13.50620, lng: -71.99971, radius: 600, type: 'Zona cercana / validar alcance' }
+  {
+    name: 'Poroy Centro',
+    lat: -13.49553, lng: -72.04360,
+    type: 'Zona principal / pueblo',
+    polygon: [
+      [-72.060, -13.493], [-72.033, -13.493], [-72.033, -13.520],
+      [-72.060, -13.520], [-72.060, -13.493]
+    ]
+  },
+  {
+    name: 'Ticahuerta',
+    lat: -13.48975, lng: -72.04266,
+    type: 'Zona norte cercana a Poroy Centro',
+    polygon: [
+      [-72.060, -13.470], [-72.033, -13.470], [-72.033, -13.493],
+      [-72.060, -13.493], [-72.060, -13.470]
+    ]
+  },
+  {
+    name: 'Cruz Verde de Quehuepay',
+    lat: -13.50626, lng: -72.00906,
+    type: 'Zona urbana / barrio',
+    polygon: [
+      [-72.013, -13.503], [-72.004, -13.503], [-72.004, -13.508],
+      [-72.013, -13.508], [-72.013, -13.503]
+    ]
+  },
+  {
+    name: 'APV Las Rocas',
+    lat: -13.50967, lng: -72.00722,
+    type: 'Zona urbana cercana a Cruz Verde',
+    polygon: [
+      [-72.013, -13.508], [-72.004, -13.508], [-72.004, -13.520],
+      [-72.013, -13.520], [-72.013, -13.508]
+    ]
+  },
+  {
+    name: 'Sencca Quispihura',
+    lat: -13.49954, lng: -72.00772,
+    type: 'Zona urbana / barrio',
+    polygon: [
+      [-72.013, -13.470], [-72.004, -13.470], [-72.004, -13.503],
+      [-72.013, -13.503], [-72.013, -13.470]
+    ]
+  },
+  {
+    name: 'Huarahuaylla',
+    lat: -13.50200, lng: -72.01853,
+    type: 'Zona intermedia central',
+    polygon: [
+      [-72.021, -13.470], [-72.013, -13.470], [-72.013, -13.520],
+      [-72.021, -13.520], [-72.021, -13.470]
+    ]
+  },
+  {
+    name: 'Huampar',
+    lat: -13.50267, lng: -72.02273,
+    type: 'Centro poblado / comunidad norte',
+    polygon: [
+      [-72.033, -13.470], [-72.021, -13.470], [-72.021, -13.503],
+      [-72.033, -13.503], [-72.033, -13.470]
+    ]
+  },
+  {
+    name: 'Chinchaysuyo',
+    lat: -13.50331, lng: -72.02323,
+    type: 'Centro poblado / comunidad sur',
+    polygon: [
+      [-72.033, -13.503], [-72.021, -13.503], [-72.021, -13.520],
+      [-72.033, -13.520], [-72.033, -13.503]
+    ]
+  },
+  {
+    name: 'Huasahuara',
+    lat: -13.50620, lng: -71.99971,
+    type: 'Zona oriental del distrito',
+    polygon: [
+      [-72.004, -13.470], [-71.990, -13.470], [-71.990, -13.520],
+      [-72.004, -13.520], [-72.004, -13.470]
+    ]
+  }
 ]
 
 const COLORS = [
@@ -26,23 +100,6 @@ const COLORS = [
   '#9333ea', '#c026d3', '#db2777'
 ]
 
-// Generar un polígono rectangular a partir del centro y el radio en metros
-function generatePoroyPolygon(lat: number, lng: number, radiusMeters: number) {
-  // A esta latitud (~ -13.5), 1 metro equivale aprox a 0.000009 grados
-  const degreePerMeter = 0.000009
-  const offset = radiusMeters * degreePerMeter
-  
-  return {
-    type: 'Polygon',
-    coordinates: [[
-      [lng - offset, lat - offset],
-      [lng + offset, lat - offset],
-      [lng + offset, lat + offset],
-      [lng - offset, lat + offset],
-      [lng - offset, lat - offset] // cerrar
-    ]]
-  }
-}
 
 async function main() {
   const isProd = process.env.NODE_ENV === 'production'
@@ -294,16 +351,16 @@ async function main() {
   for (let i = 0; i < POROY_ZONES_DATA.length; i++) {
     const zData = POROY_ZONES_DATA[i]
     const color = COLORS[i % COLORS.length]
-    const geometry = generatePoroyPolygon(zData.lat, zData.lng, zData.radius)
-    
+    const geometry = { type: 'Polygon', coordinates: [zData.polygon] }
+
     const zone = await prisma.zone.upsert({
       where: { name: zData.name },
-      update: {},
+      update: { geometry: geometry as any },
       create: {
         name: zData.name,
         district: 'Poroy',
         color,
-        description: `Zona operativa referencial de tipo ${zData.type} con un radio aproximado de ${zData.radius} metros.`,
+        description: `Zona operativa de tipo ${zData.type} en el distrito de Poroy.`,
         geometry: geometry as any,
         createdById: admin.id
       }
@@ -329,8 +386,7 @@ async function main() {
       const zone = zones[i]
       const zData = POROY_ZONES_DATA[i]
       
-      const degreePerMeter = 0.000009
-      const offset = zData.radius * degreePerMeter
+      const offset = 0.003 // ~330 m para waypoints de prueba
 
       // Definir los 4 puntos cardinales del polígono generado como waypoints
       const wps = [

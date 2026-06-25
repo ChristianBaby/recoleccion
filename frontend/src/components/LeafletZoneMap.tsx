@@ -5,8 +5,8 @@ import { MapContainer, TileLayer, Polygon, Tooltip, useMap } from 'react-leaflet
 import 'leaflet/dist/leaflet.css'
 import type { Zone } from '@/types'
 
-// Cusco, Peru
-const CUSCO_CENTER: [number, number] = [-13.5319, -71.9675]
+// Poroy, Cusco, Peru
+const POROY_CENTER: [number, number] = [-13.495, -72.025]
 
 function FitBounds({ zones }: { zones: Zone[] }) {
   const map = useMap()
@@ -40,7 +40,7 @@ export default function LeafletZoneMap({ zones, onZoneClick, selectedZoneId }: P
 
   return (
     <MapContainer
-      center={CUSCO_CENTER}
+      center={POROY_CENTER}
       zoom={13}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg"

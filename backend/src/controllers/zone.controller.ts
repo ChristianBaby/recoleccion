@@ -74,3 +74,13 @@ export async function assignMe(req: Request, res: Response, next: NextFunction) 
     next(err)
   }
 }
+
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    await zoneService.deleteZone(req.params['id'] as string)
+    ok(res, null, 'Zona eliminada exitosamente')
+  } catch (err) {
+    next(err)
+  }
+}
+

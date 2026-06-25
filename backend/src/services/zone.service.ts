@@ -109,3 +109,55 @@ export async function toggleZoneStatus(id: string) {
     data: { isActive: !zone.isActive },
   })
 }
+
+// ─── RF-03: Eliminar zona definitivamente ────────────────────────────────────
+
+export async function deleteZone(id: string) {
+  const zone = await prisma.zone.findUnique({ where: { id } })
+  if (!zone) throw { status: 404, message: 'Zona no encontrada' }
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Desvincular usuarios de la zona (poniendo zoneId = null)
+    await tx.user.updateMany({
+      where: { zoneId: id },
+      data: { zoneId: null },
+    })
+
+    // 2. Desvincular visitas educativas de la zona
+    await tx.learnVisit.updateMany({
+      where: { zoneId: id },
+      data: { zoneId: null },
+    })
+
+    // 3. Eliminar tracks GPS asociados a las ejecuciones de ruta de la zona
+    await tx.gpsTrack.deleteMany({
+      where: { routeExecution: { route: { zoneId: id } } },
+    })
+
+    // 4. Eliminar ejecuciones de ruta de las rutas de la zona
+    await tx.routeExecution.deleteMany({
+      where: { route: { zoneId: id } },
+    })
+
+    // 5. Eliminar waypoints de las rutas de la zona
+    await tx.waypoint.deleteMany({
+      where: { route: { zoneId: id } },
+    })
+
+    // 6. Eliminar tipos de residuos de las rutas de la zona
+    await tx.routeWasteType.deleteMany({
+      where: { route: { zoneId: id } },
+    })
+
+    // 7. Eliminar rutas de la zona
+    await tx.route.deleteMany({
+      where: { zoneId: id },
+    })
+
+    // 8. Eliminar la zona físicamente
+    return tx.zone.delete({
+      where: { id },
+    })
+  })
+}
+

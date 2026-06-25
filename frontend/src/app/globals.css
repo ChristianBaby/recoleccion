@@ -19,3 +19,32 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Estilos de barra de scroll global premium (Chrome, Safari, Edge y Firefox) */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 transparent !important;
+}
+
+/* Scrollbars para Webkit (Chrome, Edge, Safari) en todos los elementos */
+*::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1 !important; /* slate-300 */
+  border-radius: 10px !important;
+  border: 1.5px solid transparent !important; /* espacio alrededor */
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8 !important; /* slate-400 */
+}
+
+
