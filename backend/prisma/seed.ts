@@ -8,56 +8,38 @@ const ADMIN_PASSWORD = 'Admin2024@'
 const OPERATOR_PASSWORD = 'Operador2024@'
 const SALT_ROUNDS = 12
 
-// Lista oficial de 15 zonas operativas de Poroy (Zonas Iniciales)
+// Lista oficial de 9 zonas georreferenciadas del distrito de Poroy
 const POROY_ZONES_DATA = [
-  { name: 'Poroy Centro',          type: 'Zona urbana principal' },
-  { name: 'Cruz Verde',            type: 'Sector / APV' },
-  { name: 'Cruz Verde Quehuepay',   type: 'Barrio / sector' },
-  { name: 'El Bosque',             type: 'APV / sector urbano' },
-  { name: 'Brisas del Arco',       type: 'APV' },
-  { name: 'Villa Las Rocas',       type: 'APV' },
-  { name: '30 de Agosto',          type: 'APV' },
-  { name: 'Puerto Rico',           type: 'APV' },
-  { name: 'El Paraíso',            type: 'APV' },
-  { name: 'Nuevo Horizonte',       type: 'APV' },
-  { name: 'Villa Cruz Verde',      type: 'APV' },
-  { name: 'Bella Esperanza',       type: 'APV' },
-  { name: 'Ollachayoqpampa',       type: 'APV / sector' },
-  { name: 'Ccollayocpata',         type: 'APV / sector' },
-  { name: 'Chuñunapampa',          type: 'APV / sector' }
+  { name: 'Poroy Centro',            lat: -13.49553, lng: -72.04360, radius: 600, type: 'Zona principal / pueblo' },
+  { name: 'Ticahuerta',              lat: -13.48975, lng: -72.04266, radius: 500, type: 'Zona cercana a Poroy Centro' },
+  { name: 'Cruz Verde de Quehuepay', lat: -13.50626, lng: -72.00906, radius: 600, type: 'Zona urbana / barrio' },
+  { name: 'APV Las Rocas',           lat: -13.50967, lng: -72.00722, radius: 500, type: 'Zona urbana cercana a Cruz Verde' },
+  { name: 'Sencca Quispihura',       lat: -13.49954, lng: -72.00772, radius: 650, type: 'Zona urbana / barrio' },
+  { name: 'Huarahuaylla',            lat: -13.50200, lng: -72.01853, radius: 500, type: 'Zona intermedia' },
+  { name: 'Huampar',                 lat: -13.50267, lng: -72.02273, radius: 550, type: 'Centro poblado / comunidad' },
+  { name: 'Chinchaysuyo',            lat: -13.50331, lng: -72.02323, radius: 550, type: 'Centro poblado / comunidad' },
+  { name: 'Huasahuara',              lat: -13.50620, lng: -71.99971, radius: 600, type: 'Zona cercana / validar alcance' }
 ]
 
 const COLORS = [
   '#0d9488', '#0891b2', '#0284c7', '#2563eb', '#4f46e5', '#7c3aed',
-  '#9333ea', '#c026d3', '#db2777', '#e11d48', '#ea580c', '#d97706',
-  '#ca8a04', '#65a30d', '#16a34a', '#059669', '#14b8a6', '#06b6d4',
-  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-  '#f43f5e', '#f97316'
+  '#9333ea', '#c026d3', '#db2777'
 ]
 
-// Generar un polígono rectangular alrededor de Poroy desplazado por índice
-function generatePoroyPolygon(index: number) {
-  const baseLat = -13.4900
-  const baseLng = -72.0400
-  
-  // Distribuir en una rejilla de 5x6
-  const row = Math.floor(index / 5)
-  const col = index % 5
-  
-  // Desplazamiento de aproximadamente 600m - 1km (0.007 grados)
-  const centerLat = baseLat + (row - 2) * 0.007
-  const centerLng = baseLng + (col - 2) * 0.007
-  
-  const size = 0.0025 // tamaño del cuadradito
+// Generar un polígono rectangular a partir del centro y el radio en metros
+function generatePoroyPolygon(lat: number, lng: number, radiusMeters: number) {
+  // A esta latitud (~ -13.5), 1 metro equivale aprox a 0.000009 grados
+  const degreePerMeter = 0.000009
+  const offset = radiusMeters * degreePerMeter
   
   return {
     type: 'Polygon',
     coordinates: [[
-      [centerLng - size, centerLat - size],
-      [centerLng + size, centerLat - size],
-      [centerLng + size, centerLat + size],
-      [centerLng - size, centerLat + size],
-      [centerLng - size, centerLat - size] // cerrar el polígono
+      [lng - offset, lat - offset],
+      [lng + offset, lat - offset],
+      [lng + offset, lat + offset],
+      [lng - offset, lat + offset],
+      [lng - offset, lat - offset] // cerrar
     ]]
   }
 }
@@ -72,7 +54,7 @@ async function main() {
     bcrypt.hash(OPERATOR_PASSWORD, SALT_ROUNDS),
   ])
 
-  // ── Limpiar base de datos (solo en desarrollo) ──────────────────────────────
+  // ── Limpiar base de datos existente (solo en desarrollo) ─────────────────────
   if (!isProd) {
     console.log('🧹 Modo desarrollo: Limpiando registros anteriores de la base de datos...')
     await prisma.gpsTrack.deleteMany()
@@ -88,7 +70,7 @@ async function main() {
     await prisma.zone.deleteMany()
     console.log('✅ Base de datos limpia.')
   } else {
-    console.log('🛡️ Modo producción: Evitando limpieza destructiva de datos de producción.')
+    console.log('🛡️ Modo producción: Evitando limpieza destructiva de datos.')
   }
 
   // ── Admin ──────────────────────────────────────────────────────────────────
@@ -226,12 +208,12 @@ async function main() {
   )
   console.log('✅ Tipos de residuos creados/actualizados:', wasteTypes.length)
 
-  // ── Creación de las 26 zonas de Poroy (Idempotente) ──────────────────────────
+  // ── Creación de las 9 zonas de Poroy (Idempotente) ──────────────────────────
   const zones = []
   for (let i = 0; i < POROY_ZONES_DATA.length; i++) {
     const zData = POROY_ZONES_DATA[i]
     const color = COLORS[i % COLORS.length]
-    const geometry = generatePoroyPolygon(i)
+    const geometry = generatePoroyPolygon(zData.lat, zData.lng, zData.radius)
     
     const zone = await prisma.zone.upsert({
       where: { name: zData.name },
@@ -240,14 +222,14 @@ async function main() {
         name: zData.name,
         district: 'Poroy',
         color,
-        description: `Zona operativa de tipo ${zData.type} en el distrito de Poroy.`,
+        description: `Zona operativa referencial de tipo ${zData.type} con un radio aproximado de ${zData.radius} metros.`,
         geometry: geometry as any,
         createdById: admin.id
       }
     })
     zones.push(zone)
   }
-  console.log('✅ Zonas de Poroy creadas/verificadas:', zones.length)
+  console.log('✅ Zonas de Poroy georreferenciadas creadas/verificadas:', zones.length)
 
   // ── Lógica específica de Desarrollo (Rutas y asignaciones de prueba) ────────
   if (!isProd) {
@@ -260,24 +242,21 @@ async function main() {
     }
     console.log('✅ Zonas de prueba asignadas a operadores.')
 
-    // Se crearán rutas asociadas a las primeras 10 zonas iniciales
+    // Se crearán rutas asociadas a las zonas de Poroy
     let routeCount = 0
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < zones.length; i++) {
       const zone = zones[i]
+      const zData = POROY_ZONES_DATA[i]
       
-      const baseLat = -13.4900
-      const baseLng = -72.0400
-      const row = Math.floor(i / 5)
-      const col = i % 5
-      const centerLat = baseLat + (row - 2) * 0.007
-      const centerLng = baseLng + (col - 2) * 0.007
-      const size = 0.0025
+      const degreePerMeter = 0.000009
+      const offset = zData.radius * degreePerMeter
 
+      // Definir los 4 puntos cardinales del polígono generado como waypoints
       const wps = [
-        { order: 1, name: `Inicio de recolección — ${zone.name}`, lat: centerLat - size / 2, lng: centerLng - size / 2, estimatedTime: '07:00' },
-        { order: 2, name: `Punto de acopio A — ${zone.name}`,     lat: centerLat - size / 2, lng: centerLng + size / 2, estimatedTime: '07:20' },
-        { order: 3, name: `Punto de acopio B — ${zone.name}`,     lat: centerLat + size / 2, lng: centerLng + size / 2, estimatedTime: '07:45' },
-        { order: 4, name: `Punto final de control — ${zone.name}`,lat: centerLat + size / 2, lng: centerLng - size / 2, estimatedTime: '08:15' },
+        { order: 1, name: `Inicio de recolección — ${zone.name}`, lat: zData.lat - offset / 2, lng: zData.lng - offset / 2, estimatedTime: '07:00' },
+        { order: 2, name: `Punto de acopio A — ${zone.name}`,     lat: zData.lat - offset / 2, lng: zData.lng + offset / 2, estimatedTime: '07:20' },
+        { order: 3, name: `Punto de acopio B — ${zone.name}`,     lat: zData.lat + offset / 2, lng: zData.lng + offset / 2, estimatedTime: '07:45' },
+        { order: 4, name: `Punto final de control — ${zone.name}`,lat: zData.lat + offset / 2, lng: zData.lng - offset / 2, estimatedTime: '08:15' },
       ]
 
       const dayOfWeek = i % 2 === 0 ? [1, 3, 5] : [2, 4, 6]
