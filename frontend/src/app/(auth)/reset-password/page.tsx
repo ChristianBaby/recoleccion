@@ -51,7 +51,7 @@ function ResetPasswordContent() {
         </div>
         <Link
           href="/forgot-password"
-          className="block w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors text-center"
+          className="block w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors text-center"
         >
           Solicitar nuevo enlace
         </Link>
@@ -62,7 +62,7 @@ function ResetPasswordContent() {
   if (success) {
     return (
       <div className="text-center space-y-6 py-8">
-        <CheckCircle size={64} className="text-green-500 mx-auto" />
+        <CheckCircle size={64} className="text-teal-600 mx-auto" />
         <div>
           <h2 className="text-2xl font-bold text-slate-900">¡Contraseña actualizada!</h2>
           <p className="text-slate-500 text-sm mt-2">
@@ -71,7 +71,7 @@ function ResetPasswordContent() {
         </div>
         <button
           onClick={() => router.push('/login')}
-          className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors"
+          className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors"
         >
           Iniciar sesión
         </button>
@@ -112,7 +112,7 @@ function ResetPasswordContent() {
               autoComplete="new-password"
               {...register('password')}
               className={`w-full px-4 py-2.5 pr-10 rounded-lg border text-sm transition-colors outline-none
-                focus:ring-2 focus:ring-green-500 focus:border-transparent
+                focus:ring-2 focus:ring-teal-650 focus:border-transparent
                 ${errors.password ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'}`}
             />
             <button
@@ -138,7 +138,7 @@ function ResetPasswordContent() {
             autoComplete="new-password"
             {...register('confirmPassword')}
             className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors outline-none
-              focus:ring-2 focus:ring-green-500 focus:border-transparent
+              focus:ring-2 focus:ring-teal-650 focus:border-transparent
               ${errors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'}`}
           />
           {errors.confirmPassword && (
@@ -156,8 +156,8 @@ function ResetPasswordContent() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600
-            hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-lg
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
+            hover:bg-teal-800 disabled:bg-teal-400 text-white font-semibold rounded-lg
             transition-colors text-sm"
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
@@ -170,7 +170,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center py-8"><Loader2 className="animate-spin text-green-600" size={32} /></div>}>
+    <Suspense fallback={<div className="flex justify-center py-8"><Loader2 className="animate-spin text-teal-600" size={32} /></div>}>
       <ResetPasswordContent />
     </Suspense>
   )

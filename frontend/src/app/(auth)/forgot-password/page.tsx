@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <div className="text-center space-y-6 py-8">
-        <CheckCircle size={64} className="text-green-500 mx-auto" />
+        <CheckCircle size={64} className="text-teal-600 mx-auto" />
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Correo enviado</h2>
           <p className="text-slate-500 text-sm mt-2 leading-relaxed">
@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
         </div>
         <Link
           href="/login"
-          className="block w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors text-center"
+          className="block w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors text-center"
         >
           Volver al inicio de sesión
         </Link>
@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
               placeholder="tu@correo.com"
               {...register('email')}
               className={`w-full pl-9 pr-4 py-2.5 rounded-lg border text-sm transition-colors outline-none
-                focus:ring-2 focus:ring-green-500 focus:border-transparent
+                focus:ring-2 focus:ring-teal-650 focus:border-transparent
                 ${errors.email
                   ? 'border-red-400 bg-red-50'
                   : 'border-slate-300 bg-white hover:border-slate-400'
@@ -98,8 +98,8 @@ export default function ForgotPasswordPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600
-            hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-lg
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
+            hover:bg-teal-800 disabled:bg-teal-400 text-white font-semibold rounded-lg
             transition-colors text-sm"
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}

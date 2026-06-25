@@ -41,7 +41,7 @@ function VerifyEmailContent() {
     <div className="text-center space-y-6 py-8">
       {status === 'loading' && (
         <>
-          <Loader2 size={64} className="animate-spin text-green-500 mx-auto" />
+          <Loader2 size={64} className="animate-spin text-teal-600 mx-auto" />
           <div>
             <h2 className="text-xl font-bold text-slate-900">Verificando tu cuenta...</h2>
             <p className="text-slate-500 text-sm mt-1">Por favor espera un momento.</p>
@@ -51,14 +51,14 @@ function VerifyEmailContent() {
 
       {status === 'success' && (
         <>
-          <CheckCircle size={64} className="text-green-500 mx-auto" />
+          <CheckCircle size={64} className="text-teal-600 mx-auto" />
           <div>
             <h2 className="text-2xl font-bold text-slate-900">¡Cuenta verificada!</h2>
             <p className="text-slate-500 text-sm mt-2">{message}</p>
           </div>
           <button
             onClick={() => router.push('/login')}
-            className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors"
+            className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors"
           >
             Iniciar sesión
           </button>
@@ -74,7 +74,7 @@ function VerifyEmailContent() {
           </div>
           <button
             onClick={() => router.push('/register')}
-            className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors"
+            className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors"
           >
             Registrarse nuevamente
           </button>
@@ -89,7 +89,7 @@ export default function VerifyEmailPage() {
     <Suspense
       fallback={
         <div className="text-center space-y-6 py-8">
-          <Loader2 size={64} className="animate-spin text-green-500 mx-auto" />
+          <Loader2 size={64} className="animate-spin text-teal-600 mx-auto" />
           <h2 className="text-xl font-bold text-slate-900">Cargando...</h2>
         </div>
       }
