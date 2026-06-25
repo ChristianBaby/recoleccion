@@ -142,6 +142,10 @@ function IncidentsPageContent() {
           successCount++
         } catch (error) {
           console.error('Error al sincronizar item offline:', error)
+          if (error instanceof ApiError && error.status === 400) {
+            await deleteOfflineIncident(item.id!)
+            toast.error(`Un reporte guardado localmente tenía datos inválidos y fue descartado: ${error.message}`)
+          }
         }
       }
 
@@ -328,6 +332,11 @@ function IncidentsPageContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!accessToken) return
+
+    if (form.description.trim().length < 10) {
+      toast.error('La descripción de la incidencia debe tener al menos 10 caracteres')
+      return
+    }
 
     setSaving(true)
 
