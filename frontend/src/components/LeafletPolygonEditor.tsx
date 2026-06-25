@@ -28,7 +28,6 @@ function MapAutoCenter({ vertices, otherZones = [] }: { vertices: [number, numbe
     // 1. Si estamos editando una zona existente con vértices
     if (vertices && vertices.length >= 3) {
       const bounds = L.latLngBounds(vertices)
-      map.stop()
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: false })
     }
     // 2. Si es una nueva zona y hay otras zonas registradas, centramos en ellas combinadamente
@@ -42,12 +41,8 @@ function MapAutoCenter({ vertices, otherZones = [] }: { vertices: [number, numbe
 
       if (allPoints.length > 0) {
         const bounds = L.latLngBounds(allPoints)
-        map.stop()
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: false })
       }
-    }
-    return () => {
-      map.stop()
     }
   }, [map, vertices, otherZones])
 
@@ -62,7 +57,6 @@ function CenterButton({ vertices }: { vertices: [number, number][] }) {
 
   function handleCenter() {
     const bounds = L.latLngBounds(vertices)
-    map.stop()
     map.fitBounds(bounds, { padding: [50, 50], animate: false })
   }
 

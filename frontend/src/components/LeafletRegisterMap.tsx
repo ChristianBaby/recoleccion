@@ -56,7 +56,6 @@ function MapController({ zones, selectedZoneId, mapRef }: MapControllerProps) {
 
     try {
       const bounds = L.latLngBounds(points)
-      map.stop()
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16, animate: false })
     } catch (e) {
       console.error('Error fitting map bounds to active zones:', e)
@@ -72,7 +71,6 @@ function MapController({ zones, selectedZoneId, mapRef }: MapControllerProps) {
     const points = zone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
     try {
       const bounds = L.latLngBounds(points)
-      map.stop()
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true })
     } catch (e) {
       console.error('Error fitting bounds to selected zone:', e)
@@ -122,7 +120,6 @@ export default function LeafletRegisterMap({ zones, selectedZoneId, selectedPoin
         const { latitude, longitude } = pos.coords
         setGpsLoading(false)
         handlePoint(latitude, longitude)
-        mapRef.current?.stop()
         mapRef.current?.setView([latitude, longitude], 15, { animate: true })
       },
       () => {

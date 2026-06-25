@@ -165,7 +165,6 @@ function FitToRoute({ routeId, waypoints }: { routeId: string | null; waypoints:
     if (!routeId || routeId === lastId.current || waypoints.length === 0) return
     lastId.current = routeId
     const timer = window.setTimeout(() => {
-      map.stop()
       map.invalidateSize()
       const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]))
       map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: false })
@@ -205,7 +204,6 @@ function FitToZones({
     if (points.length === 0) return
 
     const timer = window.setTimeout(() => {
-      map.stop()
       map.invalidateSize()
       map.fitBounds(L.latLngBounds(points), {
         padding: selectedZone ? [70, 70] : [45, 45],
@@ -267,7 +265,6 @@ export default function LeafletTrackingMap({
 
   function handleLocate() {
     if (!currentPos || !mapRef.current) return
-    mapRef.current.stop()
     mapRef.current.setView([currentPos.lat, currentPos.lng], Math.max(mapRef.current.getZoom(), 17), { animate: false })
   }
 

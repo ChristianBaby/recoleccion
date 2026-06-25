@@ -31,7 +31,6 @@ function FitWaypoints({ waypoints }: { waypoints: Waypoint[] }) {
   useEffect(() => {
     if (waypoints.length === 0) return
     const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]))
-    map.stop()
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16, animate: false })
   }, [map, waypoints])
   return null

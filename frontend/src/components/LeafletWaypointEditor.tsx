@@ -46,7 +46,6 @@ function FitZone({ zone }: { zone: Zone | null }) {
     const coords = zone.geometry.coordinates[0].map(
       ([lng, lat]) => [lat, lng] as [number, number],
     )
-    map.stop()
     map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], animate: false })
   }, [map, zone])
   return null

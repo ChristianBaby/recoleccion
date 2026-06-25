@@ -19,7 +19,6 @@ function FitBounds({ zones }: { zones: Zone[] }) {
         z.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]),
       )
       if (allPoints.length) {
-        map.stop()
         map.fitBounds(L.latLngBounds(allPoints), { padding: [20, 20], animate: false })
       }
     } catch {
