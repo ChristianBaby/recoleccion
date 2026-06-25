@@ -76,7 +76,8 @@ function generatePoroyPolygon(index: number) {
 }
 
 async function main() {
-  console.log('🌱 Iniciando seed de EcoRutas - Municipalidad de Poroy...\n')
+  const isProd = process.env.NODE_ENV === 'production'
+  console.log(`🌱 Iniciando seed de EcoRutas - Municipalidad de Poroy (Modo: ${isProd ? 'Producción' : 'Desarrollo'})...\n`)
 
   // ── Contraseñas ────────────────────────────────────────────────────────────
   const [adminHash, operatorHash] = await Promise.all([
@@ -84,20 +85,24 @@ async function main() {
     bcrypt.hash(OPERATOR_PASSWORD, SALT_ROUNDS),
   ])
 
-  // ── Limpiar base de datos existente ─────────────────────────────────────────
-  console.log('🧹 Limpiando registros anteriores de la base de datos...')
-  await prisma.gpsTrack.deleteMany()
-  await prisma.routeExecution.deleteMany()
-  await prisma.routeWasteType.deleteMany()
-  await prisma.waypoint.deleteMany()
-  await prisma.route.deleteMany()
-  await prisma.incident.deleteMany()
-  await prisma.learnVisit.deleteMany()
-  
-  // Desvincular temporalmente a los usuarios de las zonas que se borrarán
-  await prisma.user.updateMany({ data: { zoneId: null } })
-  await prisma.zone.deleteMany()
-  console.log('✅ Base de datos limpia.')
+  // ── Limpiar base de datos (solo en desarrollo) ──────────────────────────────
+  if (!isProd) {
+    console.log('🧹 Modo desarrollo: Limpiando registros anteriores de la base de datos...')
+    await prisma.gpsTrack.deleteMany()
+    await prisma.routeExecution.deleteMany()
+    await prisma.routeWasteType.deleteMany()
+    await prisma.waypoint.deleteMany()
+    await prisma.route.deleteMany()
+    await prisma.incident.deleteMany()
+    await prisma.learnVisit.deleteMany()
+    
+    // Desvincular temporalmente a los usuarios de las zonas que se borrarán
+    await prisma.user.updateMany({ data: { zoneId: null } })
+    await prisma.zone.deleteMany()
+    console.log('✅ Base de datos limpia.')
+  } else {
+    console.log('🛡️ Modo producción: Evitando limpieza destructiva de datos de producción.')
+  }
 
   // ── Admin ──────────────────────────────────────────────────────────────────
   const admin = await prisma.user.upsert({
@@ -234,15 +239,17 @@ async function main() {
   )
   console.log('✅ Tipos de residuos creados/actualizados:', wasteTypes.length)
 
-  // ── Creación de las 26 zonas de Poroy ──────────────────────────────────────
+  // ── Creación de las 26 zonas de Poroy (Idempotente) ──────────────────────────
   const zones = []
   for (let i = 0; i < POROY_ZONES_DATA.length; i++) {
     const zData = POROY_ZONES_DATA[i]
     const color = COLORS[i % COLORS.length]
     const geometry = generatePoroyPolygon(i)
     
-    const zone = await prisma.zone.create({
-      data: {
+    const zone = await prisma.zone.upsert({
+      where: { name: zData.name },
+      update: {},
+      create: {
         name: zData.name,
         district: 'Poroy',
         color,
@@ -253,71 +260,69 @@ async function main() {
     })
     zones.push(zone)
   }
-  console.log('✅ Zonas de Poroy creadas:', zones.length)
+  console.log('✅ Zonas de Poroy creadas/verificadas:', zones.length)
 
-  // Asignar zonas de prueba a operadores para evitar colisiones
-  for (let i = 0; i < operators.length; i++) {
-    await prisma.user.update({
-      where: { id: operators[i].id },
-      data: { zoneId: zones[i % zones.length].id }
-    })
+  // ── Lógica específica de Desarrollo (Rutas y asignaciones de prueba) ────────
+  if (!isProd) {
+    // Asignar zonas de prueba a operadores
+    for (let i = 0; i < operators.length; i++) {
+      await prisma.user.update({
+        where: { id: operators[i].id },
+        data: { zoneId: zones[i % zones.length].id }
+      })
+    }
+    console.log('✅ Zonas de prueba asignadas a operadores.')
+
+    // Se crearán rutas asociadas a las primeras 10 zonas iniciales
+    let routeCount = 0
+    for (let i = 0; i < 10; i++) {
+      const zone = zones[i]
+      
+      const baseLat = -13.4900
+      const baseLng = -72.0400
+      const row = Math.floor(i / 5)
+      const col = i % 5
+      const centerLat = baseLat + (row - 2) * 0.007
+      const centerLng = baseLng + (col - 2) * 0.007
+      const size = 0.0025
+
+      const wps = [
+        { order: 1, name: `Inicio de recolección — ${zone.name}`, lat: centerLat - size / 2, lng: centerLng - size / 2, estimatedTime: '07:00' },
+        { order: 2, name: `Punto de acopio A — ${zone.name}`,     lat: centerLat - size / 2, lng: centerLng + size / 2, estimatedTime: '07:20' },
+        { order: 3, name: `Punto de acopio B — ${zone.name}`,     lat: centerLat + size / 2, lng: centerLng + size / 2, estimatedTime: '07:45' },
+        { order: 4, name: `Punto final de control — ${zone.name}`,lat: centerLat + size / 2, lng: centerLng - size / 2, estimatedTime: '08:15' },
+      ]
+
+      const dayOfWeek = i % 2 === 0 ? [1, 3, 5] : [2, 4, 6]
+      const wtIdxs = i % 2 === 0 ? [0, 4] : [1, 2, 3]
+
+      const route = await prisma.route.create({
+        data: {
+          name: `Ruta Recolección ${zone.name}`,
+          status: 'ACTIVE',
+          zoneId: zone.id,
+          vehicleId: vehicles[i % vehicles.length].id,
+          operatorId: operators[i % operators.length].id,
+          createdById: admin.id,
+          dayOfWeek,
+          startTime: '07:00',
+          estimatedDuration: 90
+        }
+      })
+
+      await prisma.waypoint.createMany({
+        data: wps.map((wp) => ({ ...wp, routeId: route.id })),
+      })
+
+      await prisma.routeWasteType.createMany({
+        data: wtIdxs.map((idx) => ({ routeId: route.id, wasteTypeId: wasteTypes[idx].id })),
+      })
+
+      routeCount++
+    }
+    console.log('✅ Rutas de prueba creadas:', routeCount)
   }
-  console.log('✅ Zonas de prueba asignadas a operadores.')
 
-  // ── Creación de Rutas de Prueba en Poroy ────────────────────────────────────
-  // Se crearán rutas asociadas a las primeras 10 zonas iniciales
-  let routeCount = 0
-  
-  for (let i = 0; i < 10; i++) {
-    const zone = zones[i]
-    
-    // Obtener centro y dimensiones del polígono de la zona para situar waypoints
-    const baseLat = -13.4900
-    const baseLng = -72.0400
-    const row = Math.floor(i / 5)
-    const col = i % 5
-    const centerLat = baseLat + (row - 2) * 0.007
-    const centerLng = baseLng + (col - 2) * 0.007
-    const size = 0.0025
-
-    // Definir los 4 puntos cardinales del polígono como waypoints
-    const wps = [
-      { order: 1, name: `Inicio de recolección — ${zone.name}`, lat: centerLat - size / 2, lng: centerLng - size / 2, estimatedTime: '07:00' },
-      { order: 2, name: `Punto de acopio A — ${zone.name}`,     lat: centerLat - size / 2, lng: centerLng + size / 2, estimatedTime: '07:20' },
-      { order: 3, name: `Punto de acopio B — ${zone.name}`,     lat: centerLat + size / 2, lng: centerLng + size / 2, estimatedTime: '07:45' },
-      { order: 4, name: `Punto final de control — ${zone.name}`,lat: centerLat + size / 2, lng: centerLng - size / 2, estimatedTime: '08:15' },
-    ]
-
-    // Alternar días y tipos de residuos
-    const dayOfWeek = i % 2 === 0 ? [1, 3, 5] : [2, 4, 6] // L-M-V o M-J-S
-    const wtIdxs = i % 2 === 0 ? [0, 4] : [1, 2, 3] // Orgánicos/No Aprovechables o Reciclables
-
-    const route = await prisma.route.create({
-      data: {
-        name: `Ruta Recolección ${zone.name}`,
-        status: 'ACTIVE',
-        zoneId: zone.id,
-        vehicleId: vehicles[i % vehicles.length].id,
-        operatorId: operators[i % operators.length].id,
-        createdById: admin.id,
-        dayOfWeek,
-        startTime: '07:00',
-        estimatedDuration: 90
-      }
-    })
-
-    await prisma.waypoint.createMany({
-      data: wps.map((wp) => ({ ...wp, routeId: route.id })),
-    })
-
-    await prisma.routeWasteType.createMany({
-      data: wtIdxs.map((idx) => ({ routeId: route.id, wasteTypeId: wasteTypes[idx].id })),
-    })
-
-    routeCount++
-  }
-
-  console.log('✅ Rutas de prueba creadas:', routeCount)
   console.log('\n🎉 Seed de la Municipalidad de Poroy completado exitosamente!')
   console.log('──────────────────────────────────────────────────────')
   console.log('📧 Admin    : 204805@unsaac.edu.pe  / Admin2024@')
