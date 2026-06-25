@@ -70,8 +70,67 @@ async function main() {
     await prisma.zone.deleteMany()
     console.log('✅ Base de datos limpia.')
   } else {
-    console.log('🛡️ Modo producción: Evitando limpieza destructiva de datos.')
+    console.log('🛡️ Modo producción: Evitando limpieza destructiva general. Buscando zonas obsoletas...')
+    
+    // Limpieza selectiva e inteligente de zonas obsoletas en producción
+    const officialZoneNames = POROY_ZONES_DATA.map(z => z.name)
+    const obsoleteZones = await prisma.zone.findMany({
+      where: {
+        name: { notIn: officialZoneNames }
+      },
+      select: { id: true, name: true }
+    })
+
+    if (obsoleteZones.length > 0) {
+      const obsoleteIds = obsoleteZones.map(z => z.id)
+      console.log(`🧹 Producción: Eliminando ${obsoleteZones.length} zonas que ya no sirven: ${obsoleteZones.map(z => z.name).join(', ')}`)
+
+      // 1. Desvincular usuarios
+      await prisma.user.updateMany({
+        where: { zoneId: { in: obsoleteIds } },
+        data: { zoneId: null }
+      })
+
+      // 2. Limpiar visitas educativas de esas zonas
+      await prisma.learnVisit.deleteMany({
+        where: { zoneId: { in: obsoleteIds } }
+      })
+
+      // 3. Eliminar tracks GPS de ejecuciones de rutas obsoletas
+      await prisma.gpsTrack.deleteMany({
+        where: { routeExecution: { route: { zoneId: { in: obsoleteIds } } } }
+      })
+
+      // 4. Eliminar ejecuciones de rutas obsoletas
+      await prisma.routeExecution.deleteMany({
+        where: { route: { zoneId: { in: obsoleteIds } } }
+      })
+
+      // 5. Eliminar waypoints de rutas obsoletas
+      await prisma.waypoint.deleteMany({
+        where: { route: { zoneId: { in: obsoleteIds } } }
+      })
+
+      // 6. Eliminar tipos de residuos de rutas obsoletas
+      await prisma.routeWasteType.deleteMany({
+        where: { route: { zoneId: { in: obsoleteIds } } }
+      })
+
+      // 7. Eliminar rutas obsoletas
+      await prisma.route.deleteMany({
+        where: { zoneId: { in: obsoleteIds } }
+      })
+
+      // 8. Eliminar zonas obsoletas
+      await prisma.zone.deleteMany({
+        where: { id: { in: obsoleteIds } }
+      })
+      console.log('✅ Zonas obsoletas y sus rutas asociadas se limpiaron de producción.')
+    } else {
+      console.log('ℹ️ No se encontraron zonas obsoletas que limpiar en producción.')
+    }
   }
+
 
   // ── Admin ──────────────────────────────────────────────────────────────────
   const adminsData = [
