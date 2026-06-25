@@ -25,7 +25,7 @@ const CACHE_TTL_MS = 60_000 // 1 minuto
 async function getCitizensInZone(zoneId: string): Promise<CitizenEntry[]> {
   const now = Date.now()
   const cacheTime = citizenCacheTTL.get(zoneId) ?? 0
-  if (now - cacheTime < CACHE_TTL_MS && citizenCache.has(zoneId)) {
+  if (process.env.NODE_ENV !== 'test' && now - cacheTime < CACHE_TTL_MS && citizenCache.has(zoneId)) {
     return citizenCache.get(zoneId)!
   }
 
@@ -40,8 +40,8 @@ async function getCitizensInZone(zoneId: string): Promise<CitizenEntry[]> {
     select: { id: true, homeLat: true, homeLng: true, alertRadius: true },
   })
 
-  const result: CitizenEntry[] = citizens
-    .filter((c) => c.homeLat !== null && c.homeLng !== null)
+  const result: CitizenEntry[] = (citizens || [])
+    .filter((c) => c && c.homeLat !== null && c.homeLng !== null)
     .map((c) => ({
       id: c.id,
       homeLat: c.homeLat!,
@@ -129,7 +129,12 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
 
   // ── Operador: iniciar seguimiento ─────────────────────────────────────────
   socket.on('tracking:start', async ({ routeId }: { routeId?: string }) => {
-    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') return
+    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') {
+      console.warn(`[Socket Tracking] Intento de iniciar tracking rechazado: Usuario ${user.name} no es OPERATOR ni ADMIN.`)
+      return
+    }
+
+    console.log(`[Socket Tracking] Iniciando tracking para usuario: ${user.name} (${user.email}). Route ID: ${routeId ?? 'Ninguno'}`)
 
     let zoneId: string | null = null
     let executionId: string | null = null
@@ -144,6 +149,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
         zoneId = route.zoneId
         vehicleCode = route.vehicle?.plate ?? route.vehicleId ?? vehicleCode
         socket.join(`zone:${zoneId}`)
+        console.log(`[Socket Tracking] Asociada ruta con zona: ${zoneId} y vehículo: ${vehicleCode}. El socket se unió a la sala zone:${zoneId}`)
 
         if (route.vehicleId) {
           try {
@@ -158,8 +164,13 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
               },
             })
             executionId = execution.id
-          } catch { /* La ruta puede no tener vehículo asignado */ }
+            console.log(`[Socket Tracking] Se creó RouteExecution con ID: ${executionId}`)
+          } catch (err) {
+            console.error(`[Socket Tracking] No se pudo crear RouteExecution (quizás la ruta no tiene vehículo válido):`, err)
+          }
         }
+      } else {
+        console.warn(`[Socket Tracking] Ruta con ID ${routeId} no encontrada en la base de datos.`)
       }
     }
 
@@ -179,7 +190,12 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
   socket.on('tracking:position', async ({
     lat, lng, speed, heading,
   }: { lat: number; lng: number; speed?: number; heading?: number }) => {
-    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') return
+    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') {
+      console.warn(`[Socket Tracking] Intento de recibir posición rechazado: Usuario ${user.name} no es OPERATOR ni ADMIN.`)
+      return
+    }
+
+    console.log(`[Socket Tracking] Posición recibida de operador ${user.name}: lat=${lat}, lng=${lng}, velocidad=${speed ?? 'N/A'} km/h. ZoneId: ${socket.data.zoneId ?? 'Ninguno'}`)
 
     const truck: ActiveTruck = {
       socketId: socket.id,
@@ -196,18 +212,25 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     }
     activeTrucks.set(socket.id, truck)
     broadcastTruckUpdate(io, truck)
-    checkProximityAlerts(io, truck).catch(() => { /* no bloquear el flujo de tracking */ })
+    checkProximityAlerts(io, truck).catch((err) => {
+      console.error(`[Socket Tracking] Error al procesar alertas de proximidad para camión de ${user.name}:`, err)
+    })
 
     // Guardar en BD si hay RouteExecution
     if (socket.data.executionId) {
       prisma.gpsTrack.create({
         data: {
           routeExecutionId: socket.data.executionId,
-          lat, lng,
+          lat,
+          lng,
           speed: speed ?? null,
           heading: heading ?? null,
         },
-      }).catch(() => { /* ignorar errores de BD en tracking */ })
+      }).then(() => {
+        console.log(`[Socket Tracking] Guardado GpsTrack en BD para Execution: ${socket.data.executionId}`)
+      }).catch((err) => {
+        console.error(`[Socket Tracking] Error al guardar GpsTrack en BD para Execution ${socket.data.executionId}:`, err)
+      })
     }
   })
 
