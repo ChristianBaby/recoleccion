@@ -74,21 +74,29 @@ async function main() {
   }
 
   // ── Admin ──────────────────────────────────────────────────────────────────
-  const admin = await prisma.user.upsert({
-    where: { email: '204805@unsaac.edu.pe' },
-    update: { role: 'ADMIN', isVerified: true, isActive: true },
-    create: {
-      email: '204805@unsaac.edu.pe',
-      password: adminHash,
-      dni: '99999901',
-      firstName: 'Admin',
-      lastName: 'EcoRutas Poroy',
-      role: 'ADMIN',
-      isVerified: true,
-      isActive: true,
-    },
-  })
-  console.log('✅ Admin creado/actualizado:', admin.email)
+  const adminsData = [
+    { email: '204805@unsaac.edu.pe',          dni: '99999901', firstName: 'Admin',    lastName: 'EcoRutas Poroy' },
+    { email: '174449@unsaac.edu.pe',          dni: '99999902', firstName: 'Cristian', lastName: 'Admin Poroy' },
+    { email: 'peruandeanaventures@gmail.com', dni: '99999903', firstName: 'Cristian', lastName: 'QQ' }
+  ]
+
+  const admins = await Promise.all(
+    adminsData.map((adm) =>
+      prisma.user.upsert({
+        where: { email: adm.email },
+        update: { role: 'ADMIN', isVerified: true, isActive: true },
+        create: {
+          ...adm,
+          password: adminHash,
+          role: 'ADMIN',
+          isVerified: true,
+          isActive: true,
+        },
+      })
+    )
+  )
+  const admin = admins[0]
+  console.log('✅ Administradores creados/actualizados:', admins.map(a => a.email).join(', '))
 
   // ── Operadores ─────────────────────────────────────────────────────────────
   const operatorsData = [
