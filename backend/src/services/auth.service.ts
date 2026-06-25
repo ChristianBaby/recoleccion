@@ -4,6 +4,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/
 import { generateSecureToken, addHours, addMinutes } from '../utils/crypto'
 import { sendVerificationEmail, sendPasswordResetEmail } from './email.service'
 import type { RegisterInput, LoginInput } from '../validators/auth.validator'
+import { detectZoneByCoords } from './zone.service'
 
 const SALT_ROUNDS = 12
 const MAX_FAILED_ATTEMPTS = 5
@@ -87,11 +88,25 @@ export async function registerUser(input: RegisterInput) {
   const verificationToken = generateSecureToken()
   const verificationExpiry = addHours(new Date(), VERIFICATION_EXPIRY_HOURS)
 
-  // RF-04: buscar zona activa cuyo distrito coincida
-  const matchingZone = await prisma.zone.findFirst({
-    where: { district: { equals: input.district, mode: 'insensitive' }, isActive: true },
-    select: { id: true },
-  })
+  // RF-04: Asignación de zona por punto-en-polígono o distrito como respaldo
+  let zoneId: string | null = null
+  if (input.lat !== undefined && input.lng !== undefined) {
+    const detectedZone = await detectZoneByCoords(input.lat, input.lng)
+    if (detectedZone) {
+      zoneId = detectedZone.id
+    }
+  }
+
+  // Respaldo secundario: buscar zona activa por distrito
+  if (!zoneId) {
+    const matchingZone = await prisma.zone.findFirst({
+      where: { district: { equals: input.district, mode: 'insensitive' }, isActive: true },
+      select: { id: true },
+    })
+    if (matchingZone) {
+      zoneId = matchingZone.id
+    }
+  }
 
   const user = await prisma.user.create({
     data: {
@@ -103,9 +118,11 @@ export async function registerUser(input: RegisterInput) {
       phone: input.phone || null,
       address: input.address,
       district: input.district,
+      homeLat: input.lat ?? null,
+      homeLng: input.lng ?? null,
       emailVerificationToken: verificationToken,
       emailVerificationExpiry: verificationExpiry,
-      ...(matchingZone && { zoneId: matchingZone.id }),
+      zoneId,
     },
     select: { id: true, email: true, firstName: true, lastName: true },
   })

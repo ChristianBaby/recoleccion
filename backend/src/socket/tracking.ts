@@ -92,9 +92,16 @@ interface ActiveTruck {
 // In-memory store: socketId → truck info
 const activeTrucks = new Map<string, ActiveTruck>()
 
+function anonymizeTruck(truck: ActiveTruck): ActiveTruck {
+  return {
+    ...truck,
+    operatorName: 'Operador Autorizado',
+  }
+}
+
 function broadcastTruckUpdate(io: Server, truck: ActiveTruck) {
   if (truck.zoneId) {
-    io.to(`zone:${truck.zoneId}`).emit('tracking:truck_update', truck)
+    io.to(`zone:${truck.zoneId}`).emit('tracking:truck_update', anonymizeTruck(truck))
   }
   // El admin siempre recibe todo
   io.to('admin_room').emit('tracking:truck_update', truck)
@@ -148,9 +155,10 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     socket.data.executionId = executionId
 
     socket.emit('tracking:started', { routeId, zoneId, executionId })
-    socket.emit('tracking:trucks', Array.from(activeTrucks.values()).filter(
+    const filteredTrucks = Array.from(activeTrucks.values()).filter(
       (t) => !zoneId || t.zoneId === zoneId,
-    ))
+    )
+    socket.emit('tracking:trucks', user.role === 'ADMIN' ? filteredTrucks : filteredTrucks.map(anonymizeTruck))
   })
 
   // ── Operador: enviar posición ──────────────────────────────────────────────
@@ -193,12 +201,13 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     socket.join(`zone:${zoneId}`)
     // Enviar camiones activos en esa zona
     const zoneTrucks = Array.from(activeTrucks.values()).filter((t) => t.zoneId === zoneId)
-    socket.emit('tracking:trucks', zoneTrucks)
+    socket.emit('tracking:trucks', user.role === 'ADMIN' ? zoneTrucks : zoneTrucks.map(anonymizeTruck))
   })
 
   // ── Ciudadano sin zona: recibe todos los camiones activos ─────────────────
   socket.on('tracking:all', () => {
-    socket.emit('tracking:trucks', Array.from(activeTrucks.values()))
+    const allTrucks = Array.from(activeTrucks.values())
+    socket.emit('tracking:trucks', user.role === 'ADMIN' ? allTrucks : allTrucks.map(anonymizeTruck))
   })
 
   // ── Operador: reportar retraso (RF-13) ───────────────────────────────────

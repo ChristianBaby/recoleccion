@@ -12,7 +12,7 @@ async function sendMail(to: string, subject: string, html: string) {
   }
 
   const senderMatch = env.emailFrom.match(/^(.+?)\s*<(.+)>$/)
-  const senderName = senderMatch ? senderMatch[1].trim() : 'EcoRutas Cusco'
+  const senderName = senderMatch ? senderMatch[1].trim() : 'Sistema de Recolección'
   const senderEmail = senderMatch ? senderMatch[2].trim() : env.emailFrom
 
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -26,6 +26,9 @@ async function sendMail(to: string, subject: string, html: string) {
       to: [{ email: to }],
       subject,
       htmlContent: html,
+      headers: {
+        'X-Mailin-click': '0'
+      }
     }),
   })
 
@@ -37,12 +40,12 @@ async function sendMail(to: string, subject: string, html: string) {
 
 export async function sendVerificationEmail(to: string, firstName: string, token: string) {
   const link = `${env.frontendUrl}/verify-email?token=${token}`
-  await sendMail(to, 'Confirma tu cuenta — EcoRutas Cusco', verificationTemplate(firstName, link))
+  await sendMail(to, 'Confirma tu cuenta — Sistema de Recolección', verificationTemplate(firstName, link))
 }
 
 export async function sendPasswordResetEmail(to: string, firstName: string, token: string) {
   const link = `${env.frontendUrl}/reset-password?token=${token}`
-  await sendMail(to, 'Recupera tu contraseña — EcoRutas Cusco', resetPasswordTemplate(firstName, link))
+  await sendMail(to, 'Recupera tu contraseña — Sistema de Recolección', resetPasswordTemplate(firstName, link))
 }
 
 export async function sendZoneAssignedEmail(
@@ -53,18 +56,18 @@ export async function sendZoneAssignedEmail(
 ) {
   await sendMail(
     to,
-    'Tu zona de recolección fue asignada — EcoRutas Cusco',
+    'Tu zona de recolección fue asignada — Sistema de Recolección',
     baseTemplate(`
-      <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">¡Tu zona fue asignada! 🗺️</h2>
-      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
-        Hola <strong>${firstName}</strong>, el administrador asignó tu cuenta a la zona de recolección:
+      <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:600;">¡Tu zona fue asignada!</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        Estimado(a) <strong>${firstName}</strong>, el administrador asignó tu cuenta a la zona de recolección:
       </p>
-      <div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #bbf7d0;">
+      <div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #bbf7d0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
         <p style="margin:0 0 4px;font-size:13px;color:#64748b;">Zona</p>
-        <p style="margin:0;font-size:20px;font-weight:700;color:#16a34a;">${zoneName}</p>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#0f766e;">${zoneName}</p>
         <p style="margin:8px 0 0;font-size:13px;color:#64748b;">Distrito: <strong>${district}</strong></p>
       </div>
-      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
+      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
         Ahora recibirás notificaciones y horarios específicos para tu zona.
       </p>
     `),
@@ -86,7 +89,7 @@ export async function sendIncidentStatusEmail(
   const label = STATUS_LABELS[newStatus] ?? newStatus
   await sendMail(
     to,
-    `Tu incidencia fue actualizada — EcoRutas Cusco`,
+    `Tu incidencia fue actualizada — Sistema de Recolección`,
     incidentStatusTemplate(firstName, trackingCode, label),
   )
 }
@@ -100,29 +103,29 @@ function baseTemplate(content: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EcoRutas Cusco</title>
+  <title>Sistema de Recolección</title>
 </head>
-<body style="margin:0;padding:0;background:#f0fdf4;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;padding:40px 20px;">
+<body style="margin:0;padding:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);border:1px solid #f1f5f9;">
           <tr>
-            <td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px;text-align:center;">
-              <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;">🌿 EcoRutas Cusco</h1>
-              <p style="color:#bbf7d0;margin:8px 0 0;font-size:14px;">Sistema de Gestión de Residuos Sólidos</p>
+            <td style="background:#0f766e;padding:32px;text-align:center;">
+              <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:600;letter-spacing:-0.025em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Sistema de Recolección</h1>
+              <p style="color:#ccfbf1;margin:6px 0 0;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:0.025em;text-transform:uppercase;">Gobierno Municipal</p>
             </td>
           </tr>
           <tr>
-            <td style="padding:40px 32px;">
+            <td style="padding:40px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
               ${content}
             </td>
           </tr>
           <tr>
-            <td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-              <p style="color:#94a3b8;font-size:12px;margin:0;">
-                Municipalidad del Cusco — Sistema Inteligente de Recolección de Residuos<br>
-                Si no solicitaste esto, ignora este correo.
+            <td style="background:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <p style="color:#94a3b8;font-size:11px;line-height:1.5;margin:0;">
+                Gobierno Municipal — Sistema de Recolección de Residuos Sólidos<br>
+                Si no solicitaste esta comunicación, por favor ignora este correo.
               </p>
             </td>
           </tr>
@@ -136,61 +139,99 @@ function baseTemplate(content: string): string {
 
 function verificationTemplate(firstName: string, link: string): string {
   return baseTemplate(`
-    <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">¡Hola, ${firstName}! 👋</h2>
-    <p style="color:#475569;line-height:1.6;margin:0 0 24px;">
-      Gracias por registrarte en <strong>EcoRutas Cusco</strong>. Para activar tu cuenta y
-      empezar a consultar los horarios de recolección de tu zona, confirma tu correo electrónico.
+    <h2 style="color:#1e293b;font-size:18px;margin:0 0 16px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Estimado(a) ${firstName},</h2>
+    <p style="color:#475569;line-height:1.6;margin:0 0 24px;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Gracias por registrarte en el Sistema de Recolección. Para activar tu cuenta y acceder a los horarios y rutas de recolección de tu sector, te solicitamos confirmar tu dirección de correo electrónico.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${link}"
-         style="background:#16a34a;color:#ffffff;padding:14px 32px;border-radius:8px;
-                text-decoration:none;font-weight:600;font-size:16px;display:inline-block;">
-        ✅ Confirmar mi cuenta
+         style="background:#0f766e;color:#ffffff;padding:12px 28px;border-radius:6px;
+                text-decoration:none;font-weight:500;font-size:15px;display:inline-block;
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                box-shadow:0 2px 4px rgba(15,118,110,0.15);">
+        Confirmar cuenta
       </a>
     </div>
-    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
-      Este enlace expira en <strong>24 horas</strong>.<br>
-      Si el botón no funciona, copia este link:<br>
-      <a href="${link}" style="color:#16a34a;word-break:break-all;">${link}</a>
+    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Este enlace de confirmación expira en <strong>24 horas</strong>.<br>
+      Si tienes inconvenientes con el botón, copia y pega el siguiente enlace en tu navegador:<br>
+      <a href="${link}" style="color:#0f766e;word-break:break-all;text-decoration:none;font-weight:500;">${link}</a>
     </p>
   `)
 }
 
 function incidentStatusTemplate(firstName: string, trackingCode: string, statusLabel: string): string {
   return baseTemplate(`
-    <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">Actualización de tu incidencia 📋</h2>
-    <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
-      Hola <strong>${firstName}</strong>, el estado de tu reporte ha sido actualizado.
+    <h2 style="color:#1e293b;font-size:18px;margin:0 0 16px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Actualización de Incidencia</h2>
+    <p style="color:#475569;line-height:1.6;margin:0 0 16px;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Estimado(a) <strong>${firstName}</strong>, le informamos que el estado de su reporte ha sido actualizado en el sistema.
     </p>
-    <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:0 0 24px;border:1px solid #e2e8f0;">
-      <p style="margin:0 0 8px;font-size:13px;color:#64748b;">Código de seguimiento</p>
-      <p style="margin:0;font-size:18px;font-weight:700;color:#1e293b;font-family:monospace;">${trackingCode}</p>
-      <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Nuevo estado</p>
-      <p style="margin:4px 0 0;font-size:16px;font-weight:600;color:#16a34a;">${statusLabel}</p>
+    <div style="background:#f8fafc;border-radius:6px;padding:20px;margin:0 0 24px;border:1px solid #f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      <p style="margin:0 0 4px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Código de seguimiento</p>
+      <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#1e293b;font-family:Consolas,monaco,monospace;">${trackingCode}</p>
+      <p style="margin:0 0 4px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Nuevo estado</p>
+      <p style="margin:0;font-size:15px;font-weight:600;color:#0f766e;">${statusLabel}</p>
     </div>
-    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
-      Puedes seguir el estado de tu reporte en la sección de Incidencias del sistema.
+    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Puede realizar el seguimiento detallado de su reporte ingresando al panel de incidencias en la aplicación.
     </p>
   `)
 }
 
 function resetPasswordTemplate(firstName: string, link: string): string {
   return baseTemplate(`
-    <h2 style="color:#1e293b;font-size:20px;margin:0 0 16px;">Recupera tu contraseña 🔐</h2>
-    <p style="color:#475569;line-height:1.6;margin:0 0 24px;">
-      Hola <strong>${firstName}</strong>, recibimos una solicitud para restablecer la contraseña
-      de tu cuenta en EcoRutas Cusco.
+    <h2 style="color:#1e293b;font-size:18px;margin:0 0 16px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Recuperación de Contraseña</h2>
+    <p style="color:#475569;line-height:1.6;margin:0 0 24px;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Estimado(a) <strong>${firstName}</strong>, hemos recibido una solicitud para restablecer la contraseña asociada a tu cuenta.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${link}"
-         style="background:#16a34a;color:#ffffff;padding:14px 32px;border-radius:8px;
-                text-decoration:none;font-weight:600;font-size:16px;display:inline-block;">
-        🔑 Restablecer contraseña
+         style="background:#0f766e;color:#ffffff;padding:12px 28px;border-radius:6px;
+                text-decoration:none;font-weight:500;font-size:15px;display:inline-block;
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                box-shadow:0 2px 4px rgba(15,118,110,0.15);">
+        Restablecer contraseña
       </a>
     </div>
-    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;">
-      Este enlace expira en <strong>1 hora</strong>.<br>
-      Si no solicitaste esto, ignora este correo — tu contraseña no cambiará.
+    <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      Este enlace de recuperación expira en <strong>1 hora</strong>.<br>
+      Si no has solicitado este cambio, puedes ignorar este correo de forma segura.
     </p>
   `)
 }
+
+export async function sendRouteAssignedEmail(
+  to: string,
+  firstName: string,
+  routeName: string,
+  startTime: string | null,
+  dayOfWeek: number[]
+) {
+  const daysStr = dayOfWeek.map((d) => {
+    const names = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    return names[d] ?? ''
+  }).join(', ')
+
+  await sendMail(
+    to,
+    'Nueva ruta de recolección asignada — Sistema de Recolección',
+    baseTemplate(`
+      <h2 style="color:#1e293b;font-size:18px;margin:0 0 16px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Nueva ruta asignada</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        Estimado(a) <strong>${firstName}</strong>, se le ha asignado el rol de operador para una nueva ruta de recolección:
+      </p>
+      <div style="background:#f8fafc;border-radius:6px;padding:20px;margin:0 0 24px;border:1px solid #f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        <p style="margin:0 0 4px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Nombre de la Ruta</p>
+        <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#1e293b;">${routeName}</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Horario de Inicio</p>
+        <p style="margin:0 0 16px;font-size:15px;font-weight:600;color:#0f766e;">${startTime ?? 'No definido'}</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Días de Recolección</p>
+        <p style="margin:0;font-size:14px;color:#475569;">${daysStr}</p>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        Por favor, ingrese a la aplicación en el horario indicado para iniciar su ruta.
+      </p>
+    `)
+  )
+}
+

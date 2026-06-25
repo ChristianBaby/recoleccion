@@ -25,7 +25,7 @@ export const registerSchema = z.object({
   password: passwordRules,
   phone: z
     .string()
-    .regex(/^\+?51?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)')
+    .regex(/^(\+?51)?\d{9}$/, 'Número de teléfono inválido (ej: 987654321)')
     .optional()
     .or(z.literal('')),
   address: z
@@ -34,6 +34,11 @@ export const registerSchema = z.object({
     .max(200)
     .trim(),
   district: z.string().min(2, 'Seleccione un distrito').trim(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  consent: z.boolean().refine((val) => val === true, {
+    message: 'Debes aceptar los términos y condiciones de privacidad',
+  }),
 })
 
 export const loginSchema = z.object({

@@ -63,7 +63,7 @@ export default function LoginPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Iniciar sesión</h1>
-        <p className="text-slate-500 mt-1 text-sm">Accede a tu cuenta de EcoRutas</p>
+        <p className="text-slate-500 mt-1 text-sm">Accede al Sistema de Recolección</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
@@ -79,8 +79,8 @@ export default function LoginPage() {
             placeholder="tu@correo.com"
             {...register('email')}
             className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors outline-none
-              focus:ring-2 focus:ring-green-500 focus:border-transparent
-              ${errors.email
+              focus:ring-2 focus:ring-teal-600 focus:border-transparent
+              \${errors.email
                 ? 'border-red-400 bg-red-50'
                 : 'border-slate-300 bg-white hover:border-slate-400'
               }`}
@@ -98,7 +98,7 @@ export default function LoginPage() {
             </label>
             <Link
               href="/forgot-password"
-              className="text-xs text-green-600 hover:text-green-700 font-medium"
+              className="text-xs text-teal-700 hover:text-teal-800 font-medium"
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -111,8 +111,8 @@ export default function LoginPage() {
               placeholder="••••••••"
               {...register('password')}
               className={`w-full px-4 py-2.5 pr-10 rounded-lg border text-sm transition-colors outline-none
-                focus:ring-2 focus:ring-green-500 focus:border-transparent
-                ${errors.password
+                focus:ring-2 focus:ring-teal-600 focus:border-transparent
+                \${errors.password
                   ? 'border-red-400 bg-red-50'
                   : 'border-slate-300 bg-white hover:border-slate-400'
                 }`}
@@ -157,8 +157,8 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600
-            hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-lg
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
+            hover:bg-teal-800 disabled:bg-teal-400 text-white font-semibold rounded-lg
             transition-colors text-sm"
         >
           {isSubmitting ? (
@@ -172,7 +172,7 @@ export default function LoginPage() {
 
       <p className="text-center text-sm text-slate-500">
         ¿No tienes cuenta?{' '}
-        <Link href="/register" className="text-green-600 hover:text-green-700 font-medium">
+        <Link href="/register" className="text-teal-700 hover:text-teal-800 font-medium">
           Regístrate aquí
         </Link>
       </p>

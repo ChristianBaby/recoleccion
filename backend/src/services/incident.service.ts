@@ -68,6 +68,8 @@ export async function createIncident(input: CreateIncidentInput, citizenId: stri
     throw { status: 403, message: 'Debes tener una zona asignada para reportar incidencias' }
   }
 
+  const trackingCode = await generateTrackingCode()
+
   return prisma.incident.create({
     data: {
       type: input.type,
@@ -77,6 +79,7 @@ export async function createIncident(input: CreateIncidentInput, citizenId: stri
       lng: input.lng ?? null,
       address: input.address ?? null,
       citizenId,
+      trackingCode,
     },
     select: {
       id: true,
@@ -141,4 +144,20 @@ export async function getByTrackingCode(code: string, userId: string, role: stri
   }
 
   return incident
+}
+
+async function generateTrackingCode(): Promise<string> {
+  const year = new Date().getFullYear()
+  let code = ''
+  let exists = true
+
+  while (exists) {
+    const randomNum = Math.floor(10000 + Math.random() * 90000)
+    code = `INC-${year}-${randomNum}`
+    const found = await prisma.incident.findUnique({ where: { trackingCode: code } })
+    if (!found) {
+      exists = false
+    }
+  }
+  return code
 }

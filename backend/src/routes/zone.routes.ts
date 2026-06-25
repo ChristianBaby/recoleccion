@@ -17,6 +17,7 @@ router.use(requireAuth)
 router.post('/', requireRole('ADMIN'), validate(createZoneSchema), ctrl.create)
 router.put('/:id', requireRole('ADMIN'), validate(updateZoneSchema), ctrl.update)
 router.patch('/:id/toggle-status', requireRole('ADMIN'), ctrl.toggleStatus)
+router.delete('/:id', requireRole('ADMIN'), ctrl.remove)
 
 // RF-04: Asignación de zona al usuario autenticado
 router.post('/assign-me', ctrl.assignMe)

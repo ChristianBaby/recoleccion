@@ -15,20 +15,6 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
-import {
-  BarChart2,
-  Download,
-  Filter,
-  Loader2,
-  Users,
-  AlertTriangle,
-  CheckCircle2,
-  TrendingUp,
-  Trash2,
-  Route,
-  BookOpen,
-  Megaphone,
-} from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +76,6 @@ function downloadCSV(filename: string, rows: string[][], headers: string[]) {
 }
 
 function downloadExcel(filename: string, rows: string[][], headers: string[]) {
-  // Excel-compatible XML Spreadsheet (opens natively in Excel/LibreOffice)
   const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const toRow = (cells: string[], isHeader = false) =>
     `<Row>${cells.map((c) => `<Cell${isHeader ? ' ss:StyleID="h"' : ''}><Data ss:Type="String">${esc(c)}</Data></Cell>`).join('')}</Row>`
@@ -100,7 +85,7 @@ function downloadExcel(filename: string, rows: string[][], headers: string[]) {
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
   xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
   <Styles>
-    <Style ss:ID="h"><Font ss:Bold="1"/><Interior ss:Color="#16a34a" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>
+    <Style ss:ID="h"><Font ss:Bold="1"/><Interior ss:Color="#115e59" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>
   </Styles>
   <Worksheet ss:Name="Reporte">
     <Table>
@@ -129,15 +114,15 @@ function printPDF(title: string, headers: string[], rows: string[][]) {
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
   <style>
     body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; padding: 24px; }
-    h2 { color: #16a34a; margin-bottom: 4px; }
+    h2 { color: #115e59; margin-bottom: 4px; }
     p.sub { color: #64748b; font-size: 11px; margin-bottom: 16px; }
     table { border-collapse: collapse; width: 100%; }
-    th { background: #16a34a; color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; }
+    th { background: #115e59; color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; }
     td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
     tr:nth-child(even) td { background: #f8fafc; }
     @media print { body { padding: 0; } }
   </style></head><body>
-  <h2>EcoRutas Cusco — ${esc(title)}</h2>
+  <h2>Sistema de Gestión de Residuos — ${esc(title)}</h2>
   <p class="sub">Generado el ${new Date().toLocaleDateString('es-PE', { dateStyle: 'long' })}</p>
   <table><thead><tr>${thCells}</tr></thead><tbody>${trRows}</tbody></table>
   <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}<\/script>
@@ -151,34 +136,19 @@ function printPDF(title: string, headers: string[], rows: string[][]) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
-  icon,
   label,
   value,
   sub,
-  color = 'emerald',
 }: {
-  icon: React.ReactNode
   label: string
   value: string | number
   sub?: string
-  color?: string
 }) {
-  const colors: Record<string, string> = {
-    emerald: 'bg-emerald-50 text-emerald-600',
-    blue: 'bg-blue-50 text-blue-600',
-    amber: 'bg-amber-50 text-amber-600',
-    red: 'bg-red-50 text-red-600',
-  }
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colors[color]}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-xl font-bold text-slate-900">{value}</p>
-        {sub && <p className="text-xs text-slate-400">{sub}</p>}
-      </div>
+    <div className="bg-white rounded border border-slate-200 p-5 shadow-sm">
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-2xl font-light text-slate-900 tracking-tight">{value}</p>
+      {sub && <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1.5">{sub}</p>}
     </div>
   )
 }
@@ -190,27 +160,27 @@ function ExportButtons({
     <div className="flex items-center gap-1.5">
       <button
         onClick={onCSV}
-        className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-600
-          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-emerald-300"
+        className="text-[10px] font-bold tracking-wider text-slate-600 hover:text-teal-800 hover:border-teal-400
+          border border-slate-200 rounded px-2.5 py-1.5 uppercase transition-colors bg-white"
         title="Exportar CSV"
       >
-        <Download size={12} /> CSV
+        CSV
       </button>
       <button
         onClick={onExcel}
-        className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-600
-          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-emerald-300"
-        title="Exportar Excel"
+        className="text-[10px] font-bold tracking-wider text-slate-600 hover:text-teal-800 hover:border-teal-400
+          border border-slate-200 rounded px-2.5 py-1.5 uppercase transition-colors bg-white"
+        title="Excel"
       >
-        <Download size={12} /> Excel
+        Excel
       </button>
       <button
         onClick={onPDF}
-        className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-600
-          border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors hover:border-red-300"
-        title="Exportar PDF"
+        className="text-[10px] font-bold tracking-wider text-slate-600 hover:text-red-700 hover:border-red-450
+          border border-slate-200 rounded px-2.5 py-1.5 uppercase transition-colors bg-white"
+        title="PDF"
       >
-        <Download size={12} /> PDF
+        PDF
       </button>
     </div>
   )
@@ -218,9 +188,8 @@ function ExportButtons({
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-2">
-      <BarChart2 size={32} className="opacity-30" />
-      <p className="text-sm">{message}</p>
+    <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 rounded">
+      <p className="text-xs font-semibold uppercase tracking-wider">{message}</p>
     </div>
   )
 }
@@ -279,22 +248,20 @@ function WasteTab({
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <StatCard icon={<Route size={18} />} label="Total ejecuciones" value={totalExecutions} color="emerald" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <StatCard label="Total ejecuciones" value={totalExecutions} />
         <StatCard
-          icon={<TrendingUp size={18} />}
           label="Zona más activa"
           value={mostActive?.zoneName ?? '—'}
           sub={mostActive ? `${mostActive.executions} ejecuciones` : undefined}
-          color="blue"
         />
-        <StatCard icon={<Trash2 size={18} />} label="Zonas monitoreadas" value={data.length} color="amber" />
+        <StatCard label="Zonas monitoreadas" value={data.length} />
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-slate-700">Ejecuciones de rutas por zona</h3>
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ejecuciones de rutas por zona</h3>
           <ExportButtons
             onCSV={() => { const { headers, rows } = getExportData(); downloadCSV('residuos_por_zona.csv', rows, headers) }}
             onExcel={() => { const { headers, rows } = getExportData(); downloadExcel('residuos_por_zona.xls', rows, headers) }}
@@ -303,7 +270,7 @@ function WasteTab({
         </div>
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <Loader2 size={24} className="animate-spin text-slate-300" />
+            <span className="w-6 h-6 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
           </div>
         ) : totalExecutions === 0 ? (
           <EmptyChart message="Sin ejecuciones registradas en el período seleccionado" />
@@ -328,48 +295,50 @@ function WasteTab({
 
       {/* Detail table */}
       {data.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Zona</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Distrito</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ejecuciones</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipos de residuo</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.map((z) => (
-                <tr key={z.zoneId} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: z.color }} />
-                      <span className="font-medium text-slate-800">{z.zoneName}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{z.district}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{z.executions}</td>
-                  <td className="px-4 py-3">
-                    {z.categories.length === 0 ? (
-                      <span className="text-slate-400 text-xs">Sin datos</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {z.categories.map((c) => (
-                          <span
-                            key={c.category}
-                            className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                            style={{ backgroundColor: c.colorCode }}
-                          >
-                            {c.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
+        <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
+                  <th className="px-5 py-3.5">Zona</th>
+                  <th className="px-5 py-3.5">Distrito</th>
+                  <th className="px-5 py-3.5 text-right font-bold">Ejecuciones</th>
+                  <th className="px-5 py-3.5">Tipos de residuo</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.map((z) => (
+                  <tr key={z.zoneId} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: z.color }} />
+                        <span className="font-semibold text-slate-800">{z.zoneName}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-slate-500 font-semibold">{z.district}</td>
+                    <td className="px-5 py-4 text-right font-bold text-slate-850">{z.executions}</td>
+                    <td className="px-5 py-4">
+                      {z.categories.length === 0 ? (
+                        <span className="text-slate-400">Sin datos</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {z.categories.map((c) => (
+                            <span
+                              key={c.category}
+                              className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white"
+                              style={{ backgroundColor: c.colorCode }}
+                            >
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -438,24 +407,24 @@ function ComplianceTab({
   }
 
   function complianceColor(pct: number) {
-    if (pct >= 80) return 'text-emerald-600 bg-emerald-50'
-    if (pct >= 50) return 'text-amber-600 bg-amber-50'
-    return 'text-red-600 bg-red-50'
+    if (pct >= 80) return 'text-emerald-700 bg-emerald-50'
+    if (pct >= 50) return 'text-amber-700 bg-amber-50'
+    return 'text-red-700 bg-red-50'
   }
 
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <StatCard icon={<Route size={18} />} label="Rutas activas" value={totalRoutes} color="blue" />
-        <StatCard icon={<CheckCircle2 size={18} />} label="% Cumplimiento global" value={totalExec > 0 ? `${avgCompliance}%` : '—'} color="emerald" />
-        <StatCard icon={<TrendingUp size={18} />} label="Ejecuciones totales" value={totalExec} sub="En el período" color="amber" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <StatCard label="Rutas activas" value={totalRoutes} />
+        <StatCard label="% Cumplimiento global" value={totalExec > 0 ? `${avgCompliance}%` : '—'} />
+        <StatCard label="Ejecuciones totales" value={totalExec} sub="En el período" />
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded border border-slate-200 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-slate-700">% Cumplimiento por ruta</h3>
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">% Cumplimiento por ruta</h3>
           <ExportButtons
             onCSV={() => { const { headers, rows } = getExportDataCompliance(); downloadCSV('cumplimiento_rutas.csv', rows, headers) }}
             onExcel={() => { const { headers, rows } = getExportDataCompliance(); downloadExcel('cumplimiento_rutas.xls', rows, headers) }}
@@ -464,7 +433,7 @@ function ComplianceTab({
         </div>
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <Loader2 size={24} className="animate-spin text-slate-300" />
+            <span className="w-6 h-6 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
           </div>
         ) : totalExec === 0 ? (
           <EmptyChart message="Sin ejecuciones registradas — el gráfico se actualizará cuando los operadores inicien rutas" />
@@ -490,83 +459,85 @@ function ComplianceTab({
 
       {/* Table */}
       {data.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                <th className="text-left px-4 py-3">Ruta</th>
-                <th className="text-left px-4 py-3">Zona</th>
-                <th className="text-left px-4 py-3">Días</th>
-                <th className="text-right px-4 py-3">Ejec.</th>
-                <th className="text-right px-4 py-3">Compl.</th>
-                <th className="text-right px-4 py-3">Retraso prom.</th>
-                <th className="text-center px-4 py-3">Paradas omitidas</th>
-                <th className="text-center px-4 py-3">Cumplimiento</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.map((r) => (
-                <tr key={r.routeId} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-800">{r.routeName}</p>
-                    {r.operator && (
-                      <p className="text-xs text-slate-400">
-                        👤 {r.operator.firstName} {r.operator.lastName}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.zone?.color }} />
-                      <span className="text-slate-600 text-xs">{r.zone?.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-0.5 flex-wrap">
-                      {r.dayOfWeek.map((d) => (
-                        <span key={d} className="text-xs px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">
-                          {DAY_NAMES[d]}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-700">{r.totalExecutions}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600">{r.completed}</td>
-                  <td className="px-4 py-3 text-right text-slate-500">
-                    {r.avgDelayMinutes > 0 ? `${r.avgDelayMinutes} min` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {r.totalWaypoints === 0 ? (
-                      <span className="text-xs text-slate-300">Sin paradas</span>
-                    ) : r.totalExecutions === 0 || (r.missedStopsTotal === 0 && r.missedStopsPct === 0) ? (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">
-                        0 omitidas
-                      </span>
-                    ) : (
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          r.missedStopsPct >= 50
-                            ? 'bg-red-50 text-red-600'
-                            : r.missedStopsPct >= 20
-                            ? 'bg-amber-50 text-amber-600'
-                            : 'bg-yellow-50 text-yellow-700'
-                        }`}
-                      >
-                        {r.missedStopsTotal} ({r.missedStopsPct}%)
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${complianceColor(r.compliancePct)}`}
-                    >
-                      {r.totalExecutions === 0 ? 'Sin datos' : `${r.compliancePct}%`}
-                    </span>
-                  </td>
+        <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
+                  <th className="px-5 py-3.5">Ruta</th>
+                  <th className="px-5 py-3.5">Zona</th>
+                  <th className="px-5 py-3.5">Días</th>
+                  <th className="px-5 py-3.5 text-right">Ejec.</th>
+                  <th className="px-5 py-3.5 text-right">Compl.</th>
+                  <th className="px-5 py-3.5 text-right">Retraso prom.</th>
+                  <th className="px-5 py-3.5 text-center">Paradas omitidas</th>
+                  <th className="px-5 py-3.5 text-center">Cumplimiento</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.map((r) => (
+                  <tr key={r.routeId} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-slate-850">{r.routeName}</p>
+                      {r.operator && (
+                        <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold mt-0.5">
+                          Operador: {r.operator.firstName} {r.operator.lastName}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: r.zone?.color }} />
+                        <span className="text-slate-650 font-semibold">{r.zone?.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {r.dayOfWeek.map((d) => (
+                          <span key={d} className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">
+                            {DAY_NAMES[d]}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-right font-medium text-slate-700">{r.totalExecutions}</td>
+                    <td className="px-5 py-4 text-right font-semibold text-emerald-700">{r.completed}</td>
+                    <td className="px-5 py-4 text-right font-medium text-slate-500">
+                      {r.avgDelayMinutes > 0 ? `${r.avgDelayMinutes} min` : '—'}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      {r.totalWaypoints === 0 ? (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-350">Sin paradas</span>
+                      ) : r.totalExecutions === 0 || (r.missedStopsTotal === 0 && r.missedStopsPct === 0) ? (
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                          0 omitidas
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                            r.missedStopsPct >= 50
+                              ? 'bg-red-50 text-red-650'
+                              : r.missedStopsPct >= 20
+                              ? 'bg-amber-50 text-amber-650'
+                              : 'bg-yellow-50 text-yellow-800'
+                          }`}
+                        >
+                          {r.missedStopsTotal} ({r.missedStopsPct}%)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider ${complianceColor(r.compliancePct)}`}
+                      >
+                        {r.totalExecutions === 0 ? 'Sin datos' : `${r.compliancePct}%`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -629,7 +600,6 @@ function ParticipationTab({
     return { headers, rows }
   }
 
-  // Zonas con baja participación: < 2 incidencias Y < 3 consultas educativas
   const lowParticipationZones = byZone.filter(
     (z) => z.citizenCount > 0 && z.incidents.total < 2 && z.learnVisits < 3,
   )
@@ -639,75 +609,63 @@ function ParticipationTab({
       {/* Summary cards */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={28} className="animate-spin text-slate-300" />
+          <span className="w-6 h-6 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
             <StatCard
-              icon={<Users size={18} />}
               label="Ciudadanos registrados"
               value={data?.summary.totalCitizens ?? 0}
               sub="Usuarios activos"
-              color="blue"
             />
             <StatCard
-              icon={<AlertTriangle size={18} />}
               label="Total incidencias"
               value={data?.summary.totalIncidents ?? 0}
               sub="Reportadas"
-              color="amber"
             />
             <StatCard
-              icon={<CheckCircle2 size={18} />}
               label="Incidencias resueltas"
               value={byZone.reduce((s, z) => s + z.incidents.resolved, 0)}
               sub="Cerradas o resueltas"
-              color="emerald"
             />
             <StatCard
-              icon={<BookOpen size={18} />}
               label="Consultas educativas"
               value={data?.summary.totalLearnVisits ?? 0}
               sub="Visitas a Aprende a segregar"
-              color="blue"
             />
           </div>
 
           {/* RF-16: Sugerencia de difusión para zonas con baja participación */}
           {lowParticipationZones.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <Megaphone size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">
-                    Zonas con baja participación — se recomienda acción de difusión
-                  </p>
-                  <p className="text-xs text-amber-700 mt-0.5 mb-2">
-                    Las siguientes zonas tienen pocos reportes de incidencias y escasas consultas educativas.
-                    Considera campañas de sensibilización, notificaciones o visitas presenciales.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {lowParticipationZones.map((z) => (
-                      <span
-                        key={z.zoneId}
-                        className="flex items-center gap-1.5 text-xs bg-white border border-amber-200
-                          text-amber-800 px-2.5 py-1 rounded-full font-medium"
-                      >
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: z.color }} />
-                        {z.zoneName}
-                      </span>
-                    ))}
-                  </div>
+            <div className="bg-amber-50/40 border border-amber-200 rounded p-5">
+              <div>
+                <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Sugerencia de Difusión (RF-16)</h4>
+                <h5 className="text-sm font-bold text-amber-950 mt-1">Zonas con baja participación ciudadana</h5>
+                <p className="text-xs text-amber-800 mt-1.5 leading-relaxed">
+                  Las siguientes zonas tienen pocos reportes de incidencias y escasas consultas educativas.
+                  Se recomienda implementar campañas de sensibilización o notificaciones dirigidas.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3.5">
+                  {lowParticipationZones.map((z) => (
+                    <span
+                      key={z.zoneId}
+                      className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider bg-white border border-amber-200/60
+                        text-amber-800 px-3 py-1 rounded"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: z.color }} />
+                      {z.zoneName}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
           {/* Chart */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="bg-white rounded border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-700">Ciudadanos e incidencias por zona</h3>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ciudadanos e incidencias por zona</h3>
               <ExportButtons
                 onCSV={() => { const { headers, rows } = getExportDataParticipation(); downloadCSV('participacion_ciudadana.csv', rows, headers) }}
                 onExcel={() => { const { headers, rows } = getExportDataParticipation(); downloadExcel('participacion_ciudadana.xls', rows, headers) }}
@@ -735,61 +693,65 @@ function ParticipationTab({
 
           {/* Table */}
           {byZone.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    <th className="text-left px-4 py-3">Zona</th>
-                    <th className="text-right px-4 py-3">Ciudadanos</th>
-                    <th className="text-right px-4 py-3">Incidencias</th>
-                    <th className="text-right px-4 py-3">Abiertas</th>
-                    <th className="text-right px-4 py-3">Resueltas</th>
-                    <th className="text-right px-4 py-3">Consultas edu.</th>
-                    <th className="text-left px-4 py-3">Por tipo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {byZone.map((z) => (
-                    <tr key={z.zoneId} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: z.color }} />
-                          <span className="font-medium text-slate-800">{z.zoneName}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 pl-4">{z.district}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-blue-600">{z.citizenCount}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-700">{z.incidents.total}</td>
-                      <td className="px-4 py-3 text-right text-amber-600">{z.incidents.open}</td>
-                      <td className="px-4 py-3 text-right text-emerald-600">{z.incidents.resolved}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-semibold text-blue-600">{z.learnVisits}</span>
-                        {z.learnUniqueUsers > 0 && (
-                          <span className="text-slate-400 text-xs ml-1">
-                            ({z.learnUniqueUsers} únicos)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {Object.keys(z.incidents.byType).length === 0 ? (
-                          <span className="text-slate-300 text-xs">—</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(z.incidents.byType).map(([type, count]) => (
-                              <span
-                                key={type}
-                                className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded"
-                              >
-                                {INCIDENT_LABELS[type] ?? type}: {count}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
+            <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
+                      <th className="px-5 py-3.5">Zona</th>
+                      <th className="px-5 py-3.5 text-right">Ciudadanos</th>
+                      <th className="px-5 py-3.5 text-right">Incidencias</th>
+                      <th className="px-5 py-3.5 text-right">Abiertas</th>
+                      <th className="px-5 py-3.5 text-right">Resueltas</th>
+                      <th className="px-5 py-3.5 text-right">Consultas edu.</th>
+                      <th className="px-5 py-3.5">Por tipo</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {byZone.map((z) => (
+                      <tr key={z.zoneId} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: z.color }} />
+                            <div>
+                              <span className="font-semibold text-slate-800">{z.zoneName}</span>
+                              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{z.district}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right font-bold text-blue-800">{z.citizenCount}</td>
+                        <td className="px-5 py-4 text-right font-bold text-slate-700">{z.incidents.total}</td>
+                        <td className="px-5 py-4 text-right font-semibold text-amber-700">{z.incidents.open}</td>
+                        <td className="px-5 py-4 text-right font-semibold text-emerald-700">{z.incidents.resolved}</td>
+                        <td className="px-5 py-4 text-right">
+                          <span className="font-bold text-slate-800">{z.learnVisits}</span>
+                          {z.learnUniqueUsers > 0 && (
+                            <span className="text-slate-400 text-[10px] font-medium ml-1">
+                              ({z.learnUniqueUsers} ún.)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          {Object.keys(z.incidents.byType).length === 0 ? (
+                            <span className="text-slate-350">—</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(z.incidents.byType).map(([type, count]) => (
+                                <span
+                                  key={type}
+                                  className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-650 rounded"
+                                >
+                                  {INCIDENT_LABELS[type] ?? type}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -834,50 +796,46 @@ export default function ReportsPage() {
   if (!accessToken) return null
 
   return (
-    <div className="p-6 max-w-7xl">
+    <div className="p-8 max-w-6xl mx-auto w-full">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
-        <p className="text-slate-500 text-sm mt-1">
+      <div className="mb-8 border-b border-slate-100 pb-6">
+        <h1 className="text-3xl font-light text-slate-900 tracking-tight">Reportes</h1>
+        <p className="text-slate-500 text-xs tracking-wider uppercase mt-1.5 font-bold">
           Análisis de recolección de residuos, cumplimiento de rutas y participación ciudadana
         </p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex flex-wrap items-center gap-4">
+      <div className="bg-white rounded border border-slate-200 p-5 mb-8 flex flex-wrap items-center gap-6">
         <div className="flex items-center gap-2 text-slate-500 shrink-0">
-          <Filter size={15} />
-          <span className="text-sm font-medium">Filtros:</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filtros</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">Desde</label>
+        <div className="flex items-center gap-3">
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Desde</label>
           <input
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none
-              focus:ring-2 focus:ring-emerald-500"
+            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">Hasta</label>
+        <div className="flex items-center gap-3">
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Hasta</label>
           <input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none
-              focus:ring-2 focus:ring-emerald-500"
+            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">Zona</label>
+        <div className="flex items-center gap-3">
+          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Zona</label>
           <select
             value={zoneId}
             onChange={(e) => setZoneId(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none
-              focus:ring-2 focus:ring-emerald-500"
+            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
           >
             <option value="">Todas las zonas</option>
             {zones.map((z) => (
@@ -890,23 +848,23 @@ export default function ReportsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1">
+      <div className="flex gap-1.5 mb-8 bg-slate-100/60 rounded p-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm
-              font-medium transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded text-xs
+              font-bold tracking-wider uppercase transition-all ${
               activeTab === tab.key
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-teal-800 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-250/20'
             }`}
           >
             <span>{tab.label}</span>
             <span
-              className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
+              className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
                 activeTab === tab.key
-                  ? 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-teal-900 text-teal-150'
                   : 'bg-slate-200 text-slate-500'
               }`}
             >

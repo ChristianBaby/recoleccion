@@ -5,17 +5,15 @@ import { useAuth } from '@/context/AuthContext'
 import { api, ApiError } from '@/lib/api'
 import type { ApiResponse, WasteType, WasteCategory } from '@/types'
 import { toast } from 'sonner'
-import { Plus, Pencil, Search, ToggleLeft, ToggleRight, X, Loader2, Recycle } from 'lucide-react'
 
 // ─── Paleta por categoría (alineada con NTP 900.058) ─────────────────────────
 const CATEGORY = {
-  ORGANIC:       { label: 'Orgánicos',       bg: 'bg-amber-50',   border: 'border-amber-200',  text: 'text-amber-800',  dot: '#92400e' },
-  RECYCLABLE:    { label: 'Reciclables',      bg: 'bg-blue-50',    border: 'border-blue-200',   text: 'text-blue-800',   dot: '#1e40af' },
-  NON_RECYCLABLE:{ label: 'No reciclables',  bg: 'bg-slate-100',  border: 'border-slate-300',  text: 'text-slate-700',  dot: '#334155' },
-  HAZARDOUS:     { label: 'Peligrosos',       bg: 'bg-orange-50',  border: 'border-orange-200', text: 'text-orange-800', dot: '#c2410c' },
+  ORGANIC:       { label: 'Orgánicos',       bg: 'bg-amber-50/40',   border: 'border-amber-250',  text: 'text-amber-900',  dot: '#92400e' },
+  RECYCLABLE:    { label: 'Reciclables',      bg: 'bg-blue-50/40',    border: 'border-blue-250',   text: 'text-blue-900',   dot: '#1e40af' },
+  NON_RECYCLABLE:{ label: 'No reciclables',  bg: 'bg-slate-50',      border: 'border-slate-200',  text: 'text-slate-800',  dot: '#334155' },
+  HAZARDOUS:     { label: 'Peligrosos',       bg: 'bg-orange-50/40',  border: 'border-orange-250', text: 'text-orange-900', dot: '#c2410c' },
 } as const
 
-// Colores predeterminados sugeridos por categoría
 const DEFAULT_COLORS: Record<WasteCategory, string> = {
   ORGANIC:        '#92400e',
   RECYCLABLE:     '#1e40af',
@@ -161,171 +159,166 @@ export default function WasteTypesPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="p-8 max-w-6xl mx-auto w-full">
       {/* Header */}
-      <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Recycle size={18} className="text-emerald-600" />
-              Catálogo de residuos
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              RF-05 / RF-06 · {items.length} tipo(s) registrados · NTP 900.058
-            </p>
-          </div>
-          {isAdmin && (
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg
-                text-sm font-medium hover:bg-emerald-700 transition-colors"
-            >
-              <Plus size={16} /> Nuevo tipo
-            </button>
-          )}
+      <div className="mb-8 border-b border-slate-100 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-light text-slate-900 tracking-tight">Catálogo de residuos</h1>
+          <p className="text-slate-500 text-xs tracking-wider uppercase mt-1.5 font-bold">
+            Catálogo institucional de segregación · NTP 900.058
+          </p>
         </div>
+        {isAdmin && (
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
+          >
+            Nuevo tipo
+          </button>
+        )}
+      </div>
 
-        {/* Search + category filter */}
-        <div className="flex gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar residuo o ejemplo..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <div className="flex gap-1">
-            {(['ALL', 'ORGANIC', 'RECYCLABLE', 'NON_RECYCLABLE', 'HAZARDOUS'] as const).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filter === cat
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {cat === 'ALL' ? 'Todos' : CATEGORY[cat].label}
-              </button>
-            ))}
-          </div>
+      {/* Search + category filter */}
+      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar residuo o ejemplo..."
+          className="w-full sm:max-w-xs px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 transition-colors"
+        />
+        <div className="flex flex-wrap gap-1">
+          {(['ALL', 'ORGANIC', 'RECYCLABLE', 'NON_RECYCLABLE', 'HAZARDOUS'] as const).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilter(cat)}
+              className={`px-3 py-1.5 rounded text-xs font-bold tracking-wider uppercase transition-colors ${
+                filter === cat
+                  ? 'bg-teal-800 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {cat === 'ALL' ? 'Todos' : CATEGORY[cat].label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-slate-300" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-center">
-            <Recycle size={40} className="text-slate-200 mb-3" />
-            <p className="text-slate-400 text-sm">
-              {search ? 'Sin resultados para tu búsqueda' : 'Sin tipos de residuos registrados'}
-            </p>
-            {isAdmin && !search && (
-              <button onClick={openCreate} className="mt-2 text-emerald-600 text-sm hover:underline">
-                Agregar el primer tipo
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((item) => {
-              const cat = CATEGORY[item.category]
-              return (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border p-4 ${cat.bg} ${cat.border} relative ${
-                    !item.isActive ? 'opacity-50' : ''
-                  }`}
-                >
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <span className="w-6 h-6 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Sin Resultados</p>
+          <p className="text-slate-500 text-sm">
+            {search ? 'No se encontraron residuos que coincidan con la búsqueda.' : 'No hay tipos de residuos registrados aún.'}
+          </p>
+          {isAdmin && !search && (
+            <button onClick={openCreate} className="mt-4 text-xs font-bold uppercase tracking-wider text-teal-800 hover:text-teal-950">
+              Agregar el primer tipo →
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filtered.map((item) => {
+            const cat = CATEGORY[item.category]
+            return (
+              <div
+                key={item.id}
+                className={`rounded-xl border p-5 flex flex-col justify-between ${cat.bg} ${cat.border} ${
+                  !item.isActive ? 'opacity-50' : ''
+                }`}
+              >
+                <div>
                   {/* Color swatch + name */}
-                  <div className="flex items-start gap-3 mb-3">
+                  <div className="flex items-start gap-3 mb-4">
                     <div
-                      className="w-9 h-9 rounded-lg shrink-0 shadow-sm border border-white/50"
+                      className="w-8 h-8 rounded shrink-0 shadow-sm border border-white/50"
                       style={{ backgroundColor: item.colorCode }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className={`font-semibold text-sm leading-tight ${cat.text}`}>
+                      <p className={`font-bold text-sm uppercase tracking-wide truncate ${cat.text}`}>
                         {item.name}
                       </p>
-                      <span className={`text-xs font-medium ${cat.text} opacity-70`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${cat.text} opacity-70`}>
                         {cat.label}
                       </span>
                     </div>
-                    {isAdmin && (
-                      <div className="flex gap-0.5 -mt-0.5 -mr-0.5">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="p-1 rounded hover:bg-white/60 text-slate-500"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(item)}
-                          className="p-1 rounded hover:bg-white/60 text-slate-500"
-                        >
-                          {item.isActive
-                            ? <ToggleRight size={14} />
-                            : <ToggleLeft size={14} />}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   {/* Description */}
                   {item.description && (
-                    <p className={`text-xs mb-2 leading-relaxed ${cat.text} opacity-80`}>
+                    <p className={`text-xs mb-4 leading-relaxed ${cat.text} opacity-85`}>
                       {item.description}
                     </p>
                   )}
 
                   {/* Examples */}
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {item.examples.slice(0, 4).map((ex, i) => (
                       <span
                         key={i}
-                        className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-slate-600 border border-white/50"
+                        className="text-[10px] font-medium px-2 py-0.5 rounded bg-white/70 text-slate-700 border border-white/40"
                       >
                         {ex}
                       </span>
                     ))}
                     {item.examples.length > 4 && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-slate-400">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-white/70 text-slate-400 font-bold">
                         +{item.examples.length - 4}
                       </span>
                     )}
                   </div>
+                </div>
 
-                  {/* Instructions */}
+                {/* Bottom section (Instructions + Admin controls) */}
+                <div className="mt-auto">
                   {item.instructions && (
-                    <p className={`text-xs mt-2 pt-2 border-t border-white/40 ${cat.text} opacity-70`}>
+                    <div className={`text-[11px] pt-3 border-t border-white/50 ${cat.text} opacity-75 leading-relaxed`}>
+                      <span className="font-bold uppercase text-[9px] tracking-wide block mb-0.5">Instrucciones:</span>
                       {item.instructions}
-                    </p>
+                    </div>
+                  )}
+
+                  {isAdmin && (
+                    <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-white/40">
+                      <button
+                        onClick={() => openEdit(item)}
+                        className={`text-[10px] font-bold uppercase tracking-wider ${cat.text} opacity-75 hover:opacity-100 transition-opacity`}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleToggle(item)}
+                        className={`text-[10px] font-bold uppercase tracking-wider ${cat.text} opacity-75 hover:opacity-100 transition-opacity`}
+                      >
+                        {item.isActive ? 'Desactivar' : 'Habilitar'}
+                      </button>
+                    </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-              <h2 className="font-semibold text-slate-900">
-                {editItem ? 'Editar tipo de residuo' : 'Nuevo tipo de residuo'}
+              <h2 className="font-semibold text-slate-900 text-sm">
+                {editItem ? 'EDITAR RESIDUO' : 'NUEVO RESIDUO'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                <X size={18} />
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-400 hover:text-slate-900 uppercase transition-colors"
+              >
+                Cerrar
               </button>
             </div>
 
@@ -333,27 +326,27 @@ export default function WasteTypesPage() {
               <div className="px-6 py-5 space-y-4">
                 {/* Name */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Nombre *</label>
+                  <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">Nombre *</label>
                   <input
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     required
                     placeholder="Ej: Papel y cartón"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 transition-colors"
                   />
                 </div>
 
                 {/* Category */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Categoría *</label>
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">Categoría *</label>
                   <select
                     value={form.category}
                     onChange={(e) => {
                       const cat = e.target.value as WasteCategory
                       setForm({ ...form, category: cat, colorCode: DEFAULT_COLORS[cat] })
                     }}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 bg-white transition-colors"
                   >
                     {(Object.keys(CATEGORY) as WasteCategory[]).map((k) => (
                       <option key={k} value={k}>{CATEGORY[k].label}</option>
@@ -363,7 +356,7 @@ export default function WasteTypesPage() {
 
                 {/* Color code */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                     Color identificador *
                   </label>
                   <div className="flex items-center gap-3">
@@ -371,33 +364,33 @@ export default function WasteTypesPage() {
                       type="color"
                       value={form.colorCode}
                       onChange={(e) => setForm({ ...form, colorCode: e.target.value })}
-                      className="w-10 h-10 rounded-lg border border-slate-300 cursor-pointer"
+                      className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
                     />
                     <input
                       type="text"
                       value={form.colorCode}
                       onChange={(e) => setForm({ ...form, colorCode: e.target.value })}
                       placeholder="#000000"
-                      className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 transition-colors"
                     />
                   </div>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">Descripción</label>
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     rows={2}
                     placeholder="Descripción breve del tipo de residuo..."
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 resize-none transition-colors"
                   />
                 </div>
 
                 {/* Examples */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                     Ejemplos * <span className="font-normal text-slate-400">(al menos uno)</span>
                   </label>
                   <div className="flex gap-2 mb-2">
@@ -407,14 +400,14 @@ export default function WasteTypesPage() {
                       onChange={(e) => setForm({ ...form, newExample: e.target.value })}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addExample() } }}
                       placeholder="Ej: Botella de plástico"
-                      className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 transition-colors"
                     />
                     <button
                       type="button"
                       onClick={addExample}
-                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium"
+                      className="px-3 py-2 bg-slate-105 hover:bg-slate-200 text-slate-700 text-xs font-bold tracking-wider uppercase rounded"
                     >
-                      <Plus size={16} />
+                      Agregar
                     </button>
                   </div>
                   {form.examples.length > 0 && (
@@ -422,16 +415,16 @@ export default function WasteTypesPage() {
                       {form.examples.map((ex, i) => (
                         <span
                           key={i}
-                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full
+                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded
                             bg-slate-100 text-slate-700"
                         >
                           {ex}
                           <button
                             type="button"
                             onClick={() => removeExample(i)}
-                            className="text-slate-400 hover:text-red-500"
+                            className="text-slate-400 hover:text-red-500 font-bold"
                           >
-                            <X size={11} />
+                            ×
                           </button>
                         </span>
                       ))}
@@ -441,7 +434,7 @@ export default function WasteTypesPage() {
 
                 {/* Instructions */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                     Instrucciones de manejo
                   </label>
                   <textarea
@@ -449,7 +442,7 @@ export default function WasteTypesPage() {
                     onChange={(e) => setForm({ ...form, instructions: e.target.value })}
                     rows={2}
                     placeholder="¿Cómo debe depositarse este residuo?"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 resize-none transition-colors"
                   />
                 </div>
               </div>
@@ -458,16 +451,18 @@ export default function WasteTypesPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
+                  className="px-4 py-2 text-xs font-bold tracking-wider text-slate-600 border border-slate-200 rounded hover:bg-slate-50 uppercase transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-teal-800 hover:bg-teal-900 disabled:bg-teal-400 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
                 >
-                  {saving && <Loader2 size={14} className="animate-spin" />}
+                  {saving && (
+                    <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-2" />
+                  )}
                   {editItem ? 'Guardar cambios' : 'Crear tipo'}
                 </button>
               </div>
