@@ -1,4 +1,4 @@
-import { listRoutes, getRoute, createRoute, updateRoute } from '../../src/services/route.service';
+import { listRoutes, getRoute, createRoute, updateRoute, getCitizenSchedule } from '../../src/services/route.service';
 import { prisma } from '../../src/config/prisma';
 
 // Mock de Prisma Client
@@ -12,6 +12,7 @@ jest.mock('../../src/config/prisma', () => ({
     },
     zone: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -189,5 +190,42 @@ describe('Pruebas de Servicio de Rutas Planificadas - CRUD y Conflictos (HU-07 /
     });
 
     expect(prisma.route.create).not.toHaveBeenCalled();
+  });
+
+  it('RF-10 retorna horarios activos de la zona asignada del ciudadano sin exponer datos personales', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'citizen-1',
+      role: 'CITIZEN',
+      zoneId: 'zone-123',
+      district: 'Poroy',
+    });
+    (prisma.route.findMany as jest.Mock).mockResolvedValue([mockRoutes[1]]);
+
+    const result = await getCitizenSchedule('citizen-1');
+
+    expect(result.source).toBe('ASSIGNED_ZONE');
+    expect(result.routes).toHaveLength(1);
+    expect(prisma.route.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { zoneId: 'zone-123', status: 'ACTIVE' },
+    }));
+  });
+
+  it('RF-10 usa una zona activa de Poroy como referencia cuando el ciudadano aun no tiene zona', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'citizen-2',
+      role: 'CITIZEN',
+      zoneId: null,
+      district: 'Poroy',
+    });
+    (prisma.zone.findFirst as jest.Mock).mockResolvedValue({ id: 'zone-ref', name: 'Poroy Centro' });
+    (prisma.route.findMany as jest.Mock).mockResolvedValue([mockRoutes[1]]);
+
+    const result = await getCitizenSchedule('citizen-2');
+
+    expect(result.source).toBe('POROY_REFERENCE');
+    expect(result.message).toContain('revision');
+    expect(prisma.route.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { zoneId: 'zone-ref', status: 'ACTIVE' },
+    }));
   });
 });

@@ -161,3 +161,90 @@ async function generateTrackingCode(): Promise<string> {
   }
   return code
 }
+
+// ─── RF-11: Actualizar incidencia (Editar) ───────────────────────────────────
+
+export async function updateIncident(
+  id: string,
+  data: {
+    type?: string
+    description?: string
+    imageUrl?: string | null
+    lat?: number | null
+    lng?: number | null
+    address?: string | null
+    status?: any
+  },
+  userId: string,
+  role: string,
+) {
+  const incident = await prisma.incident.findUnique({
+    where: { id },
+    include: { citizen: { select: { email: true, firstName: true } } },
+  })
+  if (!incident) throw { status: 404, message: 'Incidencia no encontrada' }
+
+  // Permisos: ADMIN y OPERATOR pueden editar cualquier incidencia.
+  // Ciudadanos solo pueden editar su propia incidencia si está OPEN.
+  if (role !== 'ADMIN' && role !== 'OPERATOR') {
+    if (incident.citizenId !== userId) {
+      throw { status: 403, message: 'No tienes permiso para modificar esta incidencia' }
+    }
+    if (incident.status !== 'OPEN') {
+      throw { status: 400, message: 'No puedes modificar una incidencia que ya está en revisión, resuelta o cerrada' }
+    }
+  }
+
+  // Si cambia el estado, y es Admin/Operador, notificar por correo
+  const oldStatus = incident.status
+  const newStatus = (role === 'ADMIN' || role === 'OPERATOR') && data.status !== undefined ? data.status : oldStatus
+
+  const updated = await prisma.incident.update({
+    where: { id },
+    data: {
+      type: data.type !== undefined ? data.type as any : incident.type,
+      description: data.description !== undefined ? data.description : incident.description,
+      imageUrl: data.imageUrl !== undefined ? data.imageUrl : incident.imageUrl,
+      lat: data.lat !== undefined ? data.lat : incident.lat,
+      lng: data.lng !== undefined ? data.lng : incident.lng,
+      address: data.address !== undefined ? data.address : incident.address,
+      status: newStatus,
+    },
+  })
+
+  if (newStatus !== oldStatus) {
+    try {
+      await sendIncidentStatusEmail(
+        incident.citizen.email,
+        incident.citizen.firstName,
+        incident.trackingCode,
+        newStatus,
+      )
+    } catch (err) {
+      console.error('Error enviando notificación de incidencia:', err)
+    }
+  }
+
+  return updated
+}
+
+// ─── RF-11: Eliminar incidencia ──────────────────────────────────────────────
+
+export async function deleteIncident(id: string, userId: string, role: string) {
+  const incident = await prisma.incident.findUnique({ where: { id } })
+  if (!incident) throw { status: 404, message: 'Incidencia no encontrada' }
+
+  // Permisos: ADMIN y OPERATOR pueden eliminar cualquier incidencia.
+  // Ciudadanos solo pueden eliminar sus propias incidencias si están OPEN.
+  if (role !== 'ADMIN' && role !== 'OPERATOR') {
+    if (incident.citizenId !== userId) {
+      throw { status: 403, message: 'No tienes permiso para eliminar esta incidencia' }
+    }
+    if (incident.status !== 'OPEN') {
+      throw { status: 400, message: 'No puedes eliminar una incidencia que ya está en revisión, resuelta o cerrada' }
+    }
+  }
+
+  await prisma.incident.delete({ where: { id } })
+  return { success: true }
+}

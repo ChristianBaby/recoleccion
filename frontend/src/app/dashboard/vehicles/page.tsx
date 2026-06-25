@@ -306,7 +306,7 @@ export default function VehiclesPage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <Truck size={18} className="text-emerald-600" /> Vehículos
@@ -375,7 +375,8 @@ export default function VehiclesPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold
                   text-slate-500 uppercase tracking-wide">
@@ -428,7 +429,8 @@ export default function VehiclesPage() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
       </div>

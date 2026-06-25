@@ -7,7 +7,7 @@ import type { ApiResponse, Zone } from '@/types'
 import { toast } from 'sonner'
 import {
   Users, MapPin, X, Loader2, Search,
-  CheckCircle2, AlertCircle, UserPlus, Eye, EyeOff, ToggleLeft, ToggleRight,
+  CheckCircle2, AlertCircle, UserPlus, Eye, EyeOff, ToggleLeft, ToggleRight, Mail,
 } from 'lucide-react'
 
 interface UserRow {
@@ -260,6 +260,7 @@ export default function UsersPage() {
   const [assigning, setAssigning] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
 
   const fetchUsers = useCallback(async () => {
     if (!accessToken) return
@@ -277,7 +278,12 @@ export default function UsersPage() {
     }
   }, [accessToken, filterRole, filterZone])
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchUsers()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [fetchUsers])
 
   useEffect(() => {
     if (!accessToken) return
@@ -319,6 +325,26 @@ export default function UsersPage() {
     }
   }
 
+  async function handleResendVerification(user: UserRow) {
+    setResendingId(user.id)
+    try {
+      await api.post('/auth/resend-verification', { email: user.email })
+      toast.success('Correo de verificacion reenviado')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo reenviar el correo')
+    } finally {
+      setResendingId(null)
+    }
+  }
+
+  function handleZoneFilterChange(value: string) {
+    if (value === 'with' || value === 'without') {
+      setFilterZone(value)
+      return
+    }
+    setFilterZone('all')
+  }
+
   function openAssign(user: UserRow) {
     setAssignModal(user)
     setSelectedZoneId(user.zoneId ?? '')
@@ -339,7 +365,7 @@ export default function UsersPage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-8 py-5 border-b border-slate-200 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <Users size={18} className="text-emerald-600" /> Gestión de usuarios
@@ -389,7 +415,7 @@ export default function UsersPage() {
 
           <select
             value={filterZone}
-            onChange={(e) => setFilterZone(e.target.value as any)}
+            onChange={(e) => handleZoneFilterChange(e.target.value)}
             className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none
               focus:ring-2 focus:ring-emerald-500 bg-white"
           >
@@ -413,7 +439,8 @@ export default function UsersPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold
                   text-slate-500 uppercase tracking-wide">
@@ -422,7 +449,6 @@ export default function UsersPage() {
                   <th className="text-left px-4 py-3">Rol</th>
                   <th className="text-left px-4 py-3">Estado</th>
                   <th className="text-left px-4 py-3">Zona asignada</th>
-                  <th className="text-left px-4 py-3">Distrito</th>
                   <th className="text-left px-4 py-3">Registro</th>
                   <th className="text-center px-4 py-3">Acciones</th>
                 </tr>
@@ -445,7 +471,7 @@ export default function UsersPage() {
                         <span className={`inline-flex items-center gap-1 text-xs
                           ${u.isVerified ? 'text-emerald-600' : 'text-amber-500'}`}>
                           {u.isVerified ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                          {u.isVerified ? 'Verificado' : 'Sin verificar'}
+                          {u.isVerified ? 'Correo verificado' : 'Pendiente de correo'}
                         </span>
                         <span className={`text-xs ${u.isActive ? 'text-emerald-600' : 'text-slate-400'}`}>
                           {u.isActive ? 'Activo' : 'Inactivo'}
@@ -465,7 +491,6 @@ export default function UsersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{u.district ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                       {new Date(u.createdAt).toLocaleDateString('es-PE',
                         { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -484,17 +509,32 @@ export default function UsersPage() {
                             <MapPin size={11} /> Zona
                           </button>
                         )}
+                        {!u.isVerified && (
+                          <button
+                            onClick={() => handleResendVerification(u)}
+                            disabled={resendingId === u.id}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium
+                              text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg
+                              transition-colors disabled:opacity-50"
+                            title="Reenviar correo de verificacion"
+                          >
+                            {resendingId === u.id
+                              ? <Loader2 size={11} className="animate-spin" />
+                              : <Mail size={11} />}
+                            Reenviar
+                          </button>
+                        )}
                         {/* Toggle active */}
                         <button
                           onClick={() => handleToggleActive(u)}
-                          disabled={togglingId === u.id}
+                          disabled={togglingId === u.id || !u.isVerified}
                           className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium
                             rounded-lg transition-colors disabled:opacity-50 ${
                             u.isActive
                               ? 'text-red-600 bg-red-50 hover:bg-red-100'
                               : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
                           }`}
-                          title={u.isActive ? 'Desactivar usuario' : 'Activar usuario'}
+                          title={!u.isVerified ? 'Primero debe verificar su correo' : u.isActive ? 'Desactivar usuario' : 'Activar usuario'}
                         >
                           {togglingId === u.id
                             ? <Loader2 size={11} className="animate-spin" />
@@ -506,7 +546,8 @@ export default function UsersPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
       </div>

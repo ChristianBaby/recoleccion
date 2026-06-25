@@ -197,13 +197,11 @@ function EmptyChart({ message }: { message: string }) {
 // ─── Tab: RF-14 Residuos por zona ────────────────────────────────────────────
 
 function WasteTab({
-  zones,
   accessToken,
   from,
   to,
   zoneId,
 }: {
-  zones: Zone[]
   accessToken: string
   from: string
   to: string
@@ -225,13 +223,19 @@ function WasteTab({
       .finally(() => setLoading(false))
   }, [accessToken, from, to, zoneId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const totalExecutions = data.reduce((s, z) => s + z.executions, 0)
-  const mostActive = data.reduce<WasteZone | null>(
-    (best, z) => (!best || z.executions > best.executions ? z : best),
-    null,
-  )
+  const mostActive =
+    totalExecutions > 0
+      ? data.reduce<WasteZone | null>(
+          (best, z) => (!best || z.executions > best.executions ? z : best),
+          null,
+        )
+      : null
 
   const chartData = data.map((z) => ({ name: z.zoneName, Ejecuciones: z.executions, fill: z.color }))
 
@@ -297,7 +301,7 @@ function WasteTab({
       {data.length > 0 && (
         <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[600px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
                   <th className="px-5 py-3.5">Zona</th>
@@ -376,7 +380,10 @@ function ComplianceTab({
       .finally(() => setLoading(false))
   }, [accessToken, from, to, zoneId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const totalRoutes = data.length
   const totalExec = data.reduce((s, r) => s + r.totalExecutions, 0)
@@ -386,11 +393,14 @@ function ComplianceTab({
       : 0
 
   // Chart: top 15 routes by compliance (or all if fewer)
-  const chartData = data.slice(0, 15).map((r) => ({
-    name: r.routeName.length > 12 ? r.routeName.slice(0, 12) + '…' : r.routeName,
-    Cumplimiento: r.compliancePct,
-    fill: r.zone?.color ?? '#64748b',
-  }))
+  const chartData = [...data]
+    .sort((a, b) => b.compliancePct - a.compliancePct)
+    .slice(0, 15)
+    .map((r) => ({
+      name: r.routeName.length > 12 ? r.routeName.slice(0, 12) + '…' : r.routeName,
+      Cumplimiento: r.compliancePct,
+      fill: r.zone?.color ?? '#64748b',
+    }))
 
   function getExportDataCompliance() {
     const headers = ['Ruta', 'Zona', 'Operador', 'Vehículo', 'Total Ejec.', 'Completadas', 'Con Retraso', 'Canceladas', 'Cumplimiento %', 'Retraso Prom. (min)', 'Paradas omitidas', '% Omisión']
@@ -400,7 +410,7 @@ function ComplianceTab({
       r.vehicle?.plate ?? '',
       String(r.totalExecutions), String(r.completed), String(r.delayed),
       String(r.cancelled), `${r.compliancePct}%`, String(r.avgDelayMinutes),
-      r.totalWaypoints > 0 ? String(r.missedStopsTotal) : 'Sin GPS',
+      r.totalWaypoints > 0 ? String(r.missedStopsTotal) : 'Sin paradas',
       r.totalWaypoints > 0 ? `${r.missedStopsPct}%` : '—',
     ])
     return { headers, rows }
@@ -461,7 +471,7 @@ function ComplianceTab({
       {data.length > 0 && (
         <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[700px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
                   <th className="px-5 py-3.5">Ruta</th>
@@ -580,7 +590,10 @@ function ParticipationTab({
       .finally(() => setLoading(false))
   }, [accessToken, from, to, zoneId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const byZone = data?.byZone ?? []
   const chartData = byZone.map((z) => ({
@@ -640,7 +653,7 @@ function ParticipationTab({
           {lowParticipationZones.length > 0 && (
             <div className="bg-amber-50/40 border border-amber-200 rounded p-5">
               <div>
-                <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Sugerencia de Difusión (RF-16)</h4>
+                <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Sugerencia de difusión</h4>
                 <h5 className="text-sm font-bold text-amber-950 mt-1">Zonas con baja participación ciudadana</h5>
                 <p className="text-xs text-amber-800 mt-1.5 leading-relaxed">
                   Las siguientes zonas tienen pocos reportes de incidencias y escasas consultas educativas.
@@ -695,7 +708,7 @@ function ParticipationTab({
           {byZone.length > 0 && (
             <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
                       <th className="px-5 py-3.5">Zona</th>
@@ -764,10 +777,10 @@ function ParticipationTab({
 
 type TabKey = 'waste' | 'compliance' | 'participation'
 
-const TABS: { key: TabKey; label: string; rf: string }[] = [
-  { key: 'waste', label: 'Residuos por zona', rf: 'RF-14' },
-  { key: 'compliance', label: 'Cumplimiento de rutas', rf: 'RF-15' },
-  { key: 'participation', label: 'Participación ciudadana', rf: 'RF-16' },
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'waste', label: 'Residuos por zona' },
+  { key: 'compliance', label: 'Cumplimiento de rutas' },
+  { key: 'participation', label: 'Participación ciudadana' },
 ]
 
 export default function ReportsPage() {
@@ -806,49 +819,71 @@ export default function ReportsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded border border-slate-200 p-5 mb-8 flex flex-wrap items-center gap-6">
-        <div className="flex items-center gap-2 text-slate-500 shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filtros</span>
-        </div>
+      <div className="bg-white rounded border border-slate-200 p-4 sm:p-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-[auto_minmax(160px,1fr)_minmax(160px,1fr)_minmax(220px,1.4fr)] items-end gap-4">
+          <div className="pb-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filtros</span>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Desde</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Hasta</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
-          />
-        </div>
+          <div className="space-y-1.5">
+            <label htmlFor="reports-from" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Desde
+            </label>
+            <div className="relative">
+              <input
+                id="reports-from"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-full h-10 rounded border border-slate-200 bg-slate-50/50 px-3 pr-9 text-sm text-slate-800
+                  shadow-inner shadow-slate-100/60 outline-none transition-colors
+                  hover:border-slate-300 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/10"
+              />
+            </div>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Zona</label>
-          <select
-            value={zoneId}
-            onChange={(e) => setZoneId(e.target.value)}
-            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-slate-800 bg-white transition-colors"
-          >
-            <option value="">Todas las zonas</option>
-            {zones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-1.5">
+            <label htmlFor="reports-to" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Hasta
+            </label>
+            <div className="relative">
+              <input
+                id="reports-to"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full h-10 rounded border border-slate-200 bg-slate-50/50 px-3 pr-9 text-sm text-slate-800
+                  shadow-inner shadow-slate-100/60 outline-none transition-colors
+                  hover:border-slate-300 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/10"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="reports-zone" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Zona
+            </label>
+            <select
+              id="reports-zone"
+              value={zoneId}
+              onChange={(e) => setZoneId(e.target.value)}
+              className="w-full h-10 rounded border border-slate-200 bg-slate-50/50 px-3 text-sm text-slate-800
+                outline-none transition-colors hover:border-slate-300
+                focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/10"
+            >
+              <option value="">Todas las zonas</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 mb-8 bg-slate-100/60 rounded p-1">
+      <div className="flex flex-col sm:flex-row gap-1.5 mb-8 bg-slate-100/60 rounded p-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -861,22 +896,13 @@ export default function ReportsPage() {
             }`}
           >
             <span>{tab.label}</span>
-            <span
-              className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
-                activeTab === tab.key
-                  ? 'bg-teal-900 text-teal-150'
-                  : 'bg-slate-200 text-slate-500'
-              }`}
-            >
-              {tab.rf}
-            </span>
           </button>
         ))}
       </div>
 
       {/* Tab content */}
       {activeTab === 'waste' && (
-        <WasteTab zones={zones} accessToken={accessToken} from={from} to={to} zoneId={zoneId} />
+        <WasteTab accessToken={accessToken} from={from} to={to} zoneId={zoneId} />
       )}
       {activeTab === 'compliance' && (
         <ComplianceTab accessToken={accessToken} from={from} to={to} zoneId={zoneId} />

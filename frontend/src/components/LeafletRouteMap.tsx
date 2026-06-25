@@ -31,7 +31,8 @@ function FitWaypoints({ waypoints }: { waypoints: Waypoint[] }) {
   useEffect(() => {
     if (waypoints.length === 0) return
     const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]))
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16 })
+    map.stop()
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16, animate: false })
   }, [map, waypoints])
   return null
 }
@@ -58,6 +59,9 @@ export default function LeafletRouteMap({ route, zones = [] }: Props) {
       center={CUSCO_CENTER}
       zoom={14}
       style={{ height: '100%', width: '100%' }}
+      zoomAnimation={false}
+      fadeAnimation={false}
+      markerZoomAnimation={false}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

@@ -17,6 +17,7 @@ export interface TruckPosition {
   socketId: string
   operatorId: string
   operatorName: string
+  vehicleCode: string
   routeId: string | null
   zoneId: string | null
   lat: number
@@ -163,9 +164,59 @@ function FitToRoute({ routeId, waypoints }: { routeId: string | null; waypoints:
   useEffect(() => {
     if (!routeId || routeId === lastId.current || waypoints.length === 0) return
     lastId.current = routeId
-    const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]))
-    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 })
+    const timer = window.setTimeout(() => {
+      map.stop()
+      map.invalidateSize()
+      const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]))
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: false })
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+    }
   }, [map, routeId, waypoints])
+
+  return null
+}
+
+function FitToZones({
+  zones,
+  selectedZoneId,
+  routeId,
+  hasRouteBounds,
+}: {
+  zones: Zone[]
+  selectedZoneId?: string
+  routeId: string | null
+  hasRouteBounds: boolean
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (routeId && hasRouteBounds) return
+
+    const activeZones = zones.filter((z) => z.isActive)
+    const selectedZone = activeZones.find((z) => z.id === selectedZoneId)
+    const zonesToFit = selectedZone ? [selectedZone] : activeZones
+    if (zonesToFit.length === 0) return
+
+    const points = zonesToFit.flatMap((z) =>
+      z.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]),
+    )
+    if (points.length === 0) return
+
+    const timer = window.setTimeout(() => {
+      map.stop()
+      map.invalidateSize()
+      map.fitBounds(L.latLngBounds(points), {
+        padding: selectedZone ? [70, 70] : [45, 45],
+        maxZoom: selectedZone ? 15 : 14,
+        animate: false,
+      })
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [map, zones, selectedZoneId, routeId, hasRouteBounds])
 
   return null
 }
@@ -192,13 +243,16 @@ interface Props {
   ownSocketId?: string
   routeOverlay?: RouteOverlay | null
   isTracking?: boolean
+  selectedZoneId?: string
 }
+
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LeafletTrackingMap({
   zones, trucks, myPosition, idlePosition,
-  ownSocketId, routeOverlay, isTracking = false,
+  ownSocketId, routeOverlay, isTracking = false, selectedZoneId,
 }: Props) {
   const mapRef = useRef<L.Map | null>(null)
   const onReady = useCallback((m: L.Map) => { mapRef.current = m }, [])
@@ -213,7 +267,8 @@ export default function LeafletTrackingMap({
 
   function handleLocate() {
     if (!currentPos || !mapRef.current) return
-    mapRef.current.flyTo([currentPos.lat, currentPos.lng], Math.max(mapRef.current.getZoom(), 17))
+    mapRef.current.stop()
+    mapRef.current.setView([currentPos.lat, currentPos.lng], Math.max(mapRef.current.getZoom(), 17), { animate: false })
   }
 
   function wpColor(idx: number) {
@@ -225,9 +280,22 @@ export default function LeafletTrackingMap({
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
-      <MapContainer center={CUSCO_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
+      <MapContainer
+        center={CUSCO_CENTER}
+        zoom={13}
+        style={{ height: '100%', width: '100%' }}
+        zoomAnimation={false}
+        fadeAnimation={false}
+        markerZoomAnimation={false}
+      >
         <MapCapturer onReady={onReady} />
         <FitToRoute routeId={routeOverlay?.routeId ?? null} waypoints={waypoints} />
+        <FitToZones
+          zones={zones}
+          selectedZoneId={selectedZoneId}
+          routeId={routeOverlay?.routeId ?? null}
+          hasRouteBounds={waypoints.length > 0}
+        />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -314,7 +382,7 @@ export default function LeafletTrackingMap({
           >
             <Popup>
               <div className="text-xs">
-                <p className="font-semibold">{truck.operatorName}</p>
+                <p className="font-semibold">{truck.vehicleCode || truck.operatorName}</p>
                 {truck.speed !== undefined && (
                   <p className="text-slate-500">{Math.round(truck.speed)} km/h</p>
                 )}

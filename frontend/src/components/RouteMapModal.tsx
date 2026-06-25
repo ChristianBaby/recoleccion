@@ -33,13 +33,29 @@ export default function RouteMapModal({ routeId, zones, onClose }: Props) {
 
   useEffect(() => {
     if (!accessToken) return
-    setLoading(true)
-    setError(false)
+    let cancelled = false
+    const resetTimer = window.setTimeout(() => {
+      if (cancelled) return
+      setLoading(true)
+      setError(false)
+      setRoute(null)
+    }, 0)
     api
       .get<ApiResponse<Route>>(`/routes/${routeId}`, accessToken)
-      .then((r) => setRoute(r.data ?? null))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
+      .then((r) => {
+        window.clearTimeout(resetTimer)
+        if (!cancelled) setRoute(r.data ?? null)
+      })
+      .catch(() => {
+        window.clearTimeout(resetTimer)
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [routeId, accessToken])
 
   const waypoints = [...(route?.waypoints ?? [])].sort((a, b) => a.order - b.order)
@@ -234,7 +250,7 @@ export default function RouteMapModal({ routeId, zones, onClose }: Props) {
                 <p className="text-sm text-slate-400">No se pudo cargar el mapa.</p>
               </div>
             ) : (
-              <LeafletRouteMap route={route} zones={zones} />
+              <LeafletRouteMap key={route.id} route={route} zones={zones} />
             )}
           </div>
         </div>

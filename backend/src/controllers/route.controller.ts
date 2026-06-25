@@ -13,6 +13,15 @@ export async function list(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function mySchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await routeService.getCitizenSchedule(req.user!.id)
+    ok(res, schedule)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
     const route = await routeService.getRoute(req.params['id'] as string)

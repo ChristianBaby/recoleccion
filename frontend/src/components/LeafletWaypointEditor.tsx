@@ -46,7 +46,8 @@ function FitZone({ zone }: { zone: Zone | null }) {
     const coords = zone.geometry.coordinates[0].map(
       ([lng, lat]) => [lat, lng] as [number, number],
     )
-    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] })
+    map.stop()
+    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], animate: false })
   }, [map, zone])
   return null
 }
@@ -69,7 +70,14 @@ export default function LeafletWaypointEditor({ waypoints, onChange, zone }: Pro
   }
 
   return (
-    <MapContainer center={CUSCO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }}>
+    <MapContainer
+      center={CUSCO_CENTER}
+      zoom={14}
+      style={{ height: '100%', width: '100%' }}
+      zoomAnimation={false}
+      fadeAnimation={false}
+      markerZoomAnimation={false}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -1,12 +1,14 @@
 import { Server, Socket } from 'socket.io'
 import { prisma } from '../config/prisma'
 import { haversineDistance } from '../utils/geoUtils'
+import { createProximityDebouncer } from '../services/proximity.service'
+import { sendRouteDelayEmail } from '../services/email.service'
 
 const PROXIMITY_RADIUS_METERS = 500
 const ALERT_DEBOUNCE_MS = 5 * 60 * 1000 // 5 minutos entre alertas por ciudadano
 
 // debounce: userId → timestamp del último alert enviado
-const lastProximityAlert = new Map<string, number>()
+const proximityDebouncer = createProximityDebouncer(ALERT_DEBOUNCE_MS)
 
 interface CitizenEntry {
   id: string
@@ -59,14 +61,13 @@ async function checkProximityAlerts(io: Server, truck: ActiveTruck) {
   const citizens = await getCitizensInZone(truck.zoneId)
 
   for (const citizen of citizens) {
-    const lastAlert = lastProximityAlert.get(citizen.id) ?? 0
-    if (now - lastAlert < ALERT_DEBOUNCE_MS) continue
+    if (!proximityDebouncer.canNotify(citizen.id, now)) continue
 
     const distance = haversineDistance(truck.lat, truck.lng, citizen.homeLat, citizen.homeLng)
     if (distance <= citizen.alertRadius) {
-      lastProximityAlert.set(citizen.id, now)
+      proximityDebouncer.markNotified(citizen.id, now)
       io.to(`user:${citizen.id}`).emit('proximity:alert', {
-        operatorName: truck.operatorName,
+        vehicleCode: truck.vehicleCode,
         distance: Math.round(distance),
         alertRadius: citizen.alertRadius,
         zoneId: truck.zoneId,
@@ -80,6 +81,7 @@ interface ActiveTruck {
   socketId: string
   operatorId: string
   operatorName: string
+  vehicleCode: string
   routeId: string | null
   zoneId: string | null
   lat: number
@@ -95,6 +97,7 @@ const activeTrucks = new Map<string, ActiveTruck>()
 function anonymizeTruck(truck: ActiveTruck): ActiveTruck {
   return {
     ...truck,
+    operatorId: '',
     operatorName: 'Operador Autorizado',
   }
 }
@@ -105,6 +108,14 @@ function broadcastTruckUpdate(io: Server, truck: ActiveTruck) {
   }
   // El admin siempre recibe todo
   io.to('admin_room').emit('tracking:truck_update', truck)
+}
+
+function leaveSubscribedZone(socket: Socket) {
+  const previousZoneId = socket.data.subscribedZoneId as string | undefined
+  if (previousZoneId) {
+    socket.leave(`zone:${previousZoneId}`)
+    socket.data.subscribedZoneId = undefined
+  }
 }
 
 export function setupTrackingHandlers(io: Server, socket: Socket) {
@@ -122,14 +133,16 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
 
     let zoneId: string | null = null
     let executionId: string | null = null
+    let vehicleCode = 'Vehiculo municipal'
 
     if (routeId) {
       const route = await prisma.route.findUnique({
         where: { id: routeId },
-        select: { zoneId: true, vehicleId: true },
+        select: { zoneId: true, vehicleId: true, vehicle: { select: { plate: true } } },
       })
       if (route) {
         zoneId = route.zoneId
+        vehicleCode = route.vehicle?.plate ?? route.vehicleId ?? vehicleCode
         socket.join(`zone:${zoneId}`)
 
         if (route.vehicleId) {
@@ -153,6 +166,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     socket.data.routeId = routeId ?? null
     socket.data.zoneId = zoneId
     socket.data.executionId = executionId
+    socket.data.vehicleCode = vehicleCode
 
     socket.emit('tracking:started', { routeId, zoneId, executionId })
     const filteredTrucks = Array.from(activeTrucks.values()).filter(
@@ -171,6 +185,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
       socketId: socket.id,
       operatorId: user.id,
       operatorName: user.name,
+      vehicleCode: socket.data.vehicleCode ?? 'Vehiculo municipal',
       routeId: socket.data.routeId ?? null,
       zoneId: socket.data.zoneId ?? null,
       lat,
@@ -198,7 +213,9 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
 
   // ── Ciudadano/Admin: suscribirse a zona ───────────────────────────────────
   socket.on('tracking:subscribe', ({ zoneId }: { zoneId: string }) => {
+    leaveSubscribedZone(socket)
     socket.join(`zone:${zoneId}`)
+    socket.data.subscribedZoneId = zoneId
     // Enviar camiones activos en esa zona
     const zoneTrucks = Array.from(activeTrucks.values()).filter((t) => t.zoneId === zoneId)
     socket.emit('tracking:trucks', user.role === 'ADMIN' ? zoneTrucks : zoneTrucks.map(anonymizeTruck))
@@ -206,6 +223,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
 
   // ── Ciudadano sin zona: recibe todos los camiones activos ─────────────────
   socket.on('tracking:all', () => {
+    leaveSubscribedZone(socket)
     const allTrucks = Array.from(activeTrucks.values())
     socket.emit('tracking:trucks', user.role === 'ADMIN' ? allTrucks : allTrucks.map(anonymizeTruck))
   })
@@ -223,7 +241,7 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     // Persiste el retraso en la ejecución activa
     const execution = await prisma.routeExecution.update({
       where: { id: socket.data.executionId },
-      data: { status: 'DELAYED', delayMinutes },
+      data: { status: 'DELAYED', delayMinutes, notes: reason ?? null },
       include: { route: { select: { name: true } } },
     }).catch(() => null)
 
@@ -240,6 +258,21 @@ export function setupTrackingHandlers(io: Server, socket: Socket) {
     }
     io.to(`zone:${zoneId}`).emit('route:delay_alert', alert)
     io.to('admin_room').emit('route:delay_alert', alert)
+
+    prisma.user.findMany({
+      where: { zoneId, role: 'CITIZEN', isActive: true, isVerified: true },
+      select: { id: true, email: true, firstName: true },
+    }).then((citizens) => {
+      citizens.forEach((citizen) => {
+        sendRouteDelayEmail(
+          citizen.email,
+          citizen.firstName,
+          execution.route.name,
+          delayMinutes,
+          reason ?? '',
+        ).catch((err) => console.error('Error enviando alerta de retraso:', err))
+      })
+    }).catch(() => { /* no bloquear alerta websocket */ })
 
     socket.emit('tracking:delay_reported', { ok: true })
   })

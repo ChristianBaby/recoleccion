@@ -1,5 +1,10 @@
 import { setupTrackingHandlers } from '../../src/socket/tracking';
 import { prisma } from '../../src/config/prisma';
+import { sendRouteDelayEmail } from '../../src/services/email.service';
+
+jest.mock('../../src/services/email.service', () => ({
+  sendRouteDelayEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock de Prisma Client
 jest.mock('../../src/config/prisma', () => ({
@@ -75,7 +80,7 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
   });
 
   it('Debe unirse a la sala del distrito y emitir inicio al recibir tracking:start con routeId', async () => {
-    const mockRoute = { id: 'route-111', zoneId: 'zone-123', vehicleId: 'veh-01' };
+    const mockRoute = { id: 'route-111', zoneId: 'zone-123', vehicleId: 'veh-01', vehicle: { plate: 'CUZ-001' } };
     (prisma.route.findUnique as jest.Mock).mockResolvedValue(mockRoute);
     (prisma.routeExecution.create as jest.Mock).mockResolvedValue({ id: 'exec-999' });
 
@@ -96,6 +101,7 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
     // Simulamos que el socket ya inicio tracking y guardo zona
     mockSocket.data.zoneId = 'zone-123';
     mockSocket.data.routeId = 'route-111';
+    mockSocket.data.vehicleCode = 'CUZ-001';
 
     // Ejecutar handler de posicion
     await eventCallbacks['tracking:position']({
@@ -129,6 +135,7 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
     // Inicializar el socket con datos de zona
     mockSocket.data.zoneId = 'zone-123';
     mockSocket.data.routeId = 'route-111';
+    mockSocket.data.vehicleCode = 'CUZ-001';
 
     // Ejecutar handler de posicion
     await eventCallbacks['tracking:position']({
@@ -145,7 +152,8 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
     const proximityAlert = emittedEvents.find(e => e.room === 'user:citizen-111' && e.event === 'proximity:alert');
     expect(proximityAlert).toBeDefined();
     expect(proximityAlert?.data.distance).toBe(0);
-    expect(proximityAlert?.data.operatorName).toBe('Edmil Saire');
+    expect(proximityAlert?.data.vehicleCode).toBe('CUZ-001');
+    expect(proximityAlert?.data.operatorName).toBeUndefined();
   });
 
   it('Debe actualizar el estado de la ejecucion a DELAYED y emitir alerta de retraso (HU-13)', async () => {
@@ -154,6 +162,10 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
       route: { name: 'Ruta Centro' }
     };
     (prisma.routeExecution.update as jest.Mock).mockResolvedValue(mockExecution);
+    (prisma.user.findMany as jest.Mock).mockResolvedValue([
+      { id: 'citizen-1', email: 'vecino1@poroy.gob.pe', firstName: 'Ana' },
+      { id: 'citizen-2', email: 'vecino2@poroy.gob.pe', firstName: 'Luis' },
+    ]);
 
     mockSocket.data.executionId = 'exec-999';
     mockSocket.data.zoneId = 'zone-123';
@@ -166,7 +178,7 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
 
     expect(prisma.routeExecution.update).toHaveBeenCalledWith({
       where: { id: 'exec-999' },
-      data: { status: 'DELAYED', delayMinutes: 20 },
+      data: { status: 'DELAYED', delayMinutes: 20, notes: 'Trafico intenso en Av. Sol' },
       include: { route: { select: { name: true } } },
     });
 
@@ -175,6 +187,14 @@ describe('Pruebas de Rastreo GPS en Tiempo Real y Privacidad del Conductor - HU-
     expect(delayAlert?.data.routeName).toBe('Ruta Centro');
     expect(delayAlert?.data.delayMinutes).toBe(20);
     expect(delayAlert?.data.reason).toBe('Trafico intenso en Av. Sol');
+    expect(sendRouteDelayEmail).toHaveBeenCalledTimes(2);
+    expect(sendRouteDelayEmail).toHaveBeenCalledWith(
+      'vecino1@poroy.gob.pe',
+      'Ana',
+      'Ruta Centro',
+      20,
+      'Trafico intenso en Av. Sol',
+    );
   });
 });
 

@@ -177,7 +177,7 @@ export default function ProfilePage() {
           
           {/* Tarjeta de Identidad (no editable) */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800 font-bold text-xl mb-4">
+            <div className="w-16 h-16 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-850 font-bold text-xl mb-4">
               {profile.firstName[0]}{profile.lastName[0]}
             </div>
             <h2 className="font-bold text-lg text-slate-900 leading-tight">{profile.firstName} {profile.lastName}</h2>
@@ -331,7 +331,7 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-600">Radio de alerta</span>
-                  <span className="text-xs font-bold text-teal-800 tabular-nums bg-teal-55 px-2.5 py-1 rounded">
+                  <span className="text-xs font-bold text-teal-800 tabular-nums bg-teal-50 border border-teal-100 px-2.5 py-1 rounded">
                     {alertRadius >= 1000 ? `${(alertRadius / 1000).toFixed(1)} km` : `${alertRadius} m`}
                   </span>
                 </div>
@@ -340,7 +340,7 @@ export default function ProfilePage() {
                   min={100} max={2000} step={50}
                   value={alertRadius}
                   onChange={(e) => setAlertRadius(Number(e.target.value))}
-                  className="w-full accent-teal-700 cursor-pointer h-1 bg-slate-105 rounded-lg appearance-none"
+                  className="w-full accent-teal-700 cursor-pointer h-1 bg-slate-200 rounded-lg appearance-none"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                   <span>100 m</span>
@@ -391,7 +391,7 @@ export default function ProfilePage() {
                     />
                     {toggle !== (() => {}) && (
                       <button type="button" onClick={toggle}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650" tabIndex={-1}>
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" tabIndex={-1}>
                         {show ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     )}

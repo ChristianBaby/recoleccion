@@ -9,7 +9,7 @@ import type { ApiResponse, Route, Zone, Waypoint } from '@/types'
 import type { TruckPosition } from '@/components/LeafletTrackingMap'
 import {
   Radio, Square, Navigation, Wifi, WifiOff, MapPin, Clock,
-  AlertCircle, X, CheckCircle2, Circle, TriangleAlert,
+  AlertCircle, X, CheckCircle2, Circle, TriangleAlert, Truck
 } from 'lucide-react'
 import { toast } from 'sonner'
 import ZoneGuard from '@/components/ZoneGuard'
@@ -17,7 +17,7 @@ import type { RouteOverlay } from '@/components/LeafletTrackingMap'
 
 const LeafletTrackingMap = dynamic(() => import('@/components/LeafletTrackingMap'), { ssr: false })
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// === Helpers ==================================================================
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -30,9 +30,9 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 
 const WAYPOINT_VISIT_RADIUS = 50 // metres
 
-const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// === Page =====================================================================
 
 export default function TrackingPage() {
   const { user, accessToken } = useAuth()
@@ -51,7 +51,7 @@ export default function TrackingPage() {
   const watchIdRef = useRef<number | null>(null)
   const isTrackingRef = useRef(false)
 
-  // idle GPS — operator's position before tracking starts
+  // idle GPS - operator's position before tracking starts
   const [idlePosition, setIdlePosition] = useState<{ lat: number; lng: number } | null>(null)
 
   // start-position warning
@@ -63,17 +63,20 @@ export default function TrackingPage() {
   const [showDelayModal, setShowDelayModal] = useState(false)
   const [delayMinutes, setDelayMinutes] = useState(20)
   const [delayReason, setDelayReason] = useState('')
+  const [activeTab, setActiveTab] = useState<'panel' | 'map'>('map')
   const [delayReported, setDelayReported] = useState(false)
 
-  const todayDay = new Date().getDay() // 0=Dom … 6=Sáb
+  const todayDay = new Date().getDay() // 0=Dom ... 6=Sab
 
-  // ── Load zones + operator routes ──────────────────────────────────────────
+  // --- Load zones + operator routes ------------------------------------------
   useEffect(() => {
     if (!accessToken) return
-    api.get<ApiResponse<Zone[]>>('/zones', accessToken).then((r) => setZones(r.data ?? []))
+    const getZones = api.get as (endpoint: string, token?: string) => Promise<ApiResponse<Zone[]>>
+    getZones('/zones', accessToken).then((r) => setZones(r.data ?? []))
 
     if (user?.role === 'OPERATOR') {
-      api.get<ApiResponse<Route[]>>('/routes', accessToken).then((r) => {
+      const getRoutes = api.get as (endpoint: string, token?: string) => Promise<ApiResponse<Route[]>>
+      getRoutes('/routes', accessToken).then((r) => {
         const mine = (r.data ?? []).filter(
           (route) => route.operatorId === user.id && route.status === 'ACTIVE',
         )
@@ -85,46 +88,55 @@ export default function TrackingPage() {
     }
   }, [accessToken, user?.id, user?.role, todayDay])
 
-  // ── Load full route detail (with waypoints) when operator selects a route ──
+  // --- Load full route detail (with waypoints) when operator selects a route ---
   useEffect(() => {
     if (!accessToken || !selectedRouteId) {
-      setSelectedRouteDetail(null)
-      return
+      const timer = window.setTimeout(() => setSelectedRouteDetail(null), 0)
+      return () => window.clearTimeout(timer)
     }
-    api.get<ApiResponse<Route>>(`/routes/${selectedRouteId}`, accessToken)
-      .then((r) => setSelectedRouteDetail(r.data ?? null))
+    let cancelled = false
+    const getRouteDetail = api.get as (endpoint: string, token?: string) => Promise<ApiResponse<Route>>
+    getRouteDetail(`/routes/${selectedRouteId}`, accessToken)
+      .then((r) => {
+        if (!cancelled) setSelectedRouteDetail(r.data ?? null)
+      })
       .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [accessToken, selectedRouteId])
 
-  // ── Get idle GPS position for OPERATOR (so they can see themselves on the map
-  //    before pressing "Iniciar ruta" and for the proximity check) ─────────────
+  // --- Get idle GPS position for OPERATOR (so they can see themselves on the map before pressing Iniciar ruta)
   useEffect(() => {
     if (user?.role !== 'OPERATOR') return
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => setIdlePosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => { /* GPS not available — silently ignore */ },
+      () => { /* GPS not available - silently ignore */ },
       { enableHighAccuracy: true, timeout: 10000 },
     )
   }, [user?.role])
 
-  // ── Mark waypoints visited when position changes ───────────────────────────
+  // --- Mark waypoints visited when position changes ---------------------------
   useEffect(() => {
     if (!myPosition || !selectedRouteDetail?.waypoints || !isTracking) return
-    const { lat, lng } = myPosition
-    const wps = selectedRouteDetail.waypoints
-    const updates = new Set(visitedWaypoints)
-    let changed = false
-    for (const wp of wps) {
-      if (!updates.has(wp.id) && haversineMeters(lat, lng, wp.lat, wp.lng) <= WAYPOINT_VISIT_RADIUS) {
-        updates.add(wp.id)
-        changed = true
+    const timer = window.setTimeout(() => {
+      const { lat, lng } = myPosition
+      const wps = selectedRouteDetail.waypoints ?? []
+      const updates = new Set(visitedWaypoints)
+      let changed = false
+      for (const wp of wps) {
+        if (!updates.has(wp.id) && haversineMeters(lat, lng, wp.lat, wp.lng) <= WAYPOINT_VISIT_RADIUS) {
+          updates.add(wp.id)
+          changed = true
+        }
       }
-    }
-    if (changed) setVisitedWaypoints(new Set(updates))
+      if (changed) setVisitedWaypoints(new Set(updates))
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [myPosition, selectedRouteDetail, isTracking]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Socket setup ──────────────────────────────────────────────────────────
+  // --- Socket setup ----------------------------------------------------------
   useEffect(() => {
     if (!accessToken) return
     const socket = getSocket(accessToken)
@@ -149,12 +161,12 @@ export default function TrackingPage() {
       toast.success('Retraso notificado a los ciudadanos de la zona.')
     }
 
-    function onProximityAlert({ operatorName, distance }: { operatorName: string; distance: number }) {
+    function onProximityAlert({ vehicleCode, distance }: { vehicleCode: string; distance: number }) {
       const distText = distance >= 1000
         ? `${(distance / 1000).toFixed(1)} km`
         : `${distance} m`
-      toast('🚛 ¡El camión está cerca!', {
-        description: `${operatorName} está a ${distText} de tu domicilio. Prepara tus residuos.`,
+      toast('El camion esta cerca', {
+        description: `Vehiculo ${vehicleCode} a ${distText} de tu domicilio. Prepara tus residuos.`,
         duration: 30000,
       })
     }
@@ -166,9 +178,15 @@ export default function TrackingPage() {
     socket.on('tracking:truck_removed', onTruckRemoved)
     socket.on('tracking:delay_reported', onDelayReported)
     socket.on('proximity:alert', onProximityAlert)
-    if (socket.connected) { setIsConnected(true); setOwnSocketId(socket.id ?? undefined) }
+    const timer = window.setTimeout(() => {
+      if (socket.connected) {
+        setIsConnected(true)
+        setOwnSocketId(socket.id ?? undefined)
+      }
+    }, 0)
 
     return () => {
+      window.clearTimeout(timer)
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('tracking:trucks', onTrucks)
@@ -179,22 +197,29 @@ export default function TrackingPage() {
     }
   }, [accessToken])
 
-  // ── Citizen zone subscription ─────────────────────────────────────────────
+  // --- Citizen zone subscription --------------------------------------------
   useEffect(() => {
     if (user?.role === 'CITIZEN' && user.zoneId && !selectedZoneId) {
-      setSelectedZoneId(user.zoneId)
+      const timer = window.setTimeout(() => setSelectedZoneId(user.zoneId!), 0)
+      return () => window.clearTimeout(timer)
     }
   }, [user?.zoneId, user?.role, selectedZoneId])
 
   useEffect(() => {
     const socket = socketRef.current
     if (!socket || !isConnected || user?.role !== 'CITIZEN') return
-    const zoneToSubscribe = user.zoneId ?? selectedZoneId
+    const zoneToSubscribe = selectedZoneId
     if (zoneToSubscribe) socket.emit('tracking:subscribe', { zoneId: zoneToSubscribe })
     else socket.emit('tracking:all')
-  }, [selectedZoneId, isConnected, user?.role, user?.zoneId])
+  }, [selectedZoneId, isConnected, user?.role])
 
-  // ── Internal: begin GPS watch + emit tracking:start ──────────────────────
+  useEffect(() => {
+    const socket = socketRef.current
+    if (!socket || !isConnected || user?.role !== 'ADMIN') return
+    socket.emit('tracking:all')
+  }, [isConnected, user?.role])
+
+  // --- Internal: begin GPS watch + emit tracking:start ----------------------
   const beginTracking = useCallback(() => {
     const socket = socketRef.current
     if (!socket) return
@@ -214,12 +239,12 @@ export default function TrackingPage() {
           speed: speed != null ? speed * 3.6 : undefined,
         })
       },
-      () => toast.error('No se pudo obtener la ubicación GPS'),
+      () => toast.error('No se pudo obtener la ubicacion GPS'),
       { enableHighAccuracy: true, maximumAge: 5000 },
     )
   }, [selectedRouteId])
 
-  // ── GPS start — checks proximity to first waypoint first ─────────────────
+  // --- GPS start - checks proximity to first waypoint first -----------------
   const startTracking = useCallback(() => {
     const sortedWps = [...(selectedRouteDetail?.waypoints ?? [])].sort(
       (a, b) => a.order - b.order,
@@ -263,7 +288,7 @@ export default function TrackingPage() {
     }
   }, [])
 
-  // ── Derived state ─────────────────────────────────────────────────────────
+  // --- Derived state --------------------------------------------------------
   const todayRoutes = myRoutes.filter((r) => r.dayOfWeek.includes(todayDay))
   const otherRoutes = myRoutes.filter((r) => !r.dayOfWeek.includes(todayDay))
   const selectedRoute = myRoutes.find((r) => r.id === selectedRouteId) ?? null
@@ -282,6 +307,10 @@ export default function TrackingPage() {
       }
     : null
 
+  const mapSelectedZoneId = user?.role === 'CITIZEN'
+    ? selectedZoneId
+    : selectedRoute?.zoneId ?? undefined
+
   return (
     <ZoneGuard role={user?.role ?? ''} zoneId={user?.zoneId}>
     <div className="flex flex-col h-full">
@@ -289,7 +318,7 @@ export default function TrackingPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Rastreo en tiempo real</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Seguimiento GPS de camiones de recolección</p>
+          <p className="text-xs text-slate-500 mt-0.5">Seguimiento GPS de camiones de recoleccion</p>
         </div>
         <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full ${
           isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -299,16 +328,44 @@ export default function TrackingPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* Mobile tabs */}
+      <div className="flex md:hidden border-b border-slate-200 bg-white shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('panel')}
+          className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            activeTab === 'panel'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          {user?.role === 'OPERATOR' ? 'Paradas / Control' : 'Camiones / Filtros'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('map')}
+          className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            activeTab === 'map'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          Mapa de Rastreo
+        </button>
+      </div>
 
-        {/* ── OPERATOR PANEL ──────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+
+        {/* --- OPERATOR PANEL ---------------------------------------------- */}
         {user?.role === 'OPERATOR' && (
-          <div className="w-80 border-r border-slate-200 bg-white flex flex-col shrink-0 overflow-auto">
+          <div className={`w-full md:w-80 md:border-r border-slate-200 bg-white flex flex-col shrink-0 overflow-auto md:block ${
+            activeTab === 'panel' ? 'block h-full' : 'hidden'
+          }`}>
 
             {/* Today's route card */}
             <div className="p-4 border-b border-slate-100">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                {DAY_NAMES[todayDay]} — Rutas de hoy
+                {DAY_NAMES[todayDay]} - Rutas de hoy
               </p>
 
               {todayRoutes.length === 0 ? (
@@ -377,7 +434,7 @@ export default function TrackingPage() {
                     <option value="">Seleccionar otra ruta...</option>
                     {otherRoutes.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.name} — {r.dayOfWeek.map((d) => DAY_NAMES[d]).join(', ')}
+                        {r.name} - {r.dayOfWeek.map((d) => DAY_NAMES[d]).join(', ')}
                       </option>
                     ))}
                   </select>
@@ -411,7 +468,7 @@ export default function TrackingPage() {
               {isTracking && myPosition && (
                 <div className="bg-emerald-50 rounded-lg px-3 py-2.5 text-xs text-emerald-800 space-y-0.5">
                   <p className="font-semibold flex items-center gap-1.5">
-                    <Navigation size={11} className="text-emerald-600" /> Transmitiendo posición
+                    <Navigation size={11} className="text-emerald-600" /> Transmitiendo posicion
                   </p>
                   <p className="font-mono text-emerald-600">
                     {myPosition.lat.toFixed(5)}, {myPosition.lng.toFixed(5)}
@@ -500,9 +557,11 @@ export default function TrackingPage() {
           </div>
         )}
 
-        {/* ── CITIZEN PANEL ───────────────────────────────────────────────── */}
+        {/* --- CITIZEN PANEL ----------------------------------------------- */}
         {user?.role === 'CITIZEN' && (
-          <div className="w-64 border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0">
+          <div className={`w-full md:w-64 md:border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0 md:block ${
+            activeTab === 'panel' ? 'block h-full' : 'hidden'
+          }`}>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1.5 block">
                 <MapPin size={12} className="inline mr-1" /> Zona a monitorear
@@ -521,7 +580,7 @@ export default function TrackingPage() {
             </div>
 
             <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
-              Selecciona tu zona para ver los camiones de recolección en tiempo real.
+              Selecciona tu zona para ver los camiones de recoleccion en tiempo real.
             </div>
 
             {trucks.length > 0 ? (
@@ -533,9 +592,9 @@ export default function TrackingPage() {
                   {trucks.map((t) => (
                     <div key={t.socketId}
                       className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-lg">
-                      <span className="shrink-0">🚛</span>
+                      <Truck size={14} className="text-slate-600 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-800 truncate">{t.operatorName}</p>
+                        <p className="text-xs font-medium text-slate-800 truncate">{t.vehicleCode || t.operatorName}</p>
                         <p className="text-xs text-slate-400">
                           {new Date(t.lastSeen).toLocaleTimeString('es-PE')}
                         </p>
@@ -550,16 +609,18 @@ export default function TrackingPage() {
           </div>
         )}
 
-        {/* ── ADMIN PANEL ─────────────────────────────────────────────────── */}
+        {/* --- ADMIN PANEL ------------------------------------------------- */}
         {user?.role === 'ADMIN' && trucks.length > 0 && (
-          <div className="w-64 border-r border-slate-200 bg-white flex flex-col p-4 gap-3 shrink-0 overflow-auto">
+          <div className={`w-full md:w-64 md:border-r border-slate-200 bg-white flex flex-col p-4 gap-3 shrink-0 overflow-auto md:block ${
+            activeTab === 'panel' ? 'block h-full' : 'hidden'
+          }`}>
             <p className="text-xs font-semibold text-slate-600">Camiones activos ({trucks.length})</p>
             {trucks.map((t) => (
               <div key={t.socketId}
                 className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-lg">
-                <span className="shrink-0 mt-0.5">🚛</span>
+                <Truck size={14} className="text-slate-600 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-800 truncate">{t.operatorName}</p>
+                  <p className="text-xs font-semibold text-slate-800 truncate">{t.vehicleCode || t.operatorName}</p>
                   {t.speed !== undefined && (
                     <p className="text-xs text-slate-500">{Math.round(t.speed)} km/h</p>
                   )}
@@ -572,8 +633,10 @@ export default function TrackingPage() {
           </div>
         )}
 
-        {/* ── Map ──────────────────────────────────────────────────────────── */}
-        <div className="flex-1 relative">
+        {/* --- Map ---------------------------------------------------------- */}
+        <div className={`flex-1 relative md:block ${
+          activeTab === 'map' ? 'block h-full' : 'hidden'
+        }`}>
           <LeafletTrackingMap
             zones={zones}
             trucks={trucks}
@@ -582,6 +645,7 @@ export default function TrackingPage() {
             ownSocketId={ownSocketId}
             routeOverlay={routeOverlay}
             isTracking={isTracking}
+            selectedZoneId={mapSelectedZoneId}
           />
           {/* Map legend for operator */}
           {user?.role === 'OPERATOR' && routeOverlay && (
@@ -597,16 +661,16 @@ export default function TrackingPage() {
                 <div className="w-4 h-4 rounded-full bg-red-600 shrink-0" /> Final
               </div>
               <div className="flex items-center gap-2 text-slate-600">
-                <div className="w-4 h-4 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center text-emerald-600 font-bold" style={{fontSize:'8px'}}>✓</div>
+                <div className="w-4 h-4 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center text-emerald-600 font-bold" style={{fontSize:'8px'}}>OK</div>
                 Visitada
               </div>
               {isTracking ? (
                 <div className="flex items-center gap-2 text-slate-600">
-                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi posición
+                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi posicion
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-slate-600">
-                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi ubicación
+                  <div className="w-4 h-4 rounded-full bg-blue-500 shrink-0" /> Mi ubicacion
                 </div>
               )}
             </div>
@@ -624,7 +688,7 @@ export default function TrackingPage() {
               </div>
               <div>
                 <h2 className="font-semibold text-slate-900">Lejos del inicio de la ruta</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Verifica tu posición antes de iniciar</p>
+                <p className="text-xs text-slate-500 mt-0.5">Verifica tu posicion antes de iniciar</p>
               </div>
             </div>
 
@@ -646,8 +710,8 @@ export default function TrackingPage() {
             </div>
 
             <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-              Tu posición actual está a más de 500 m del inicio de la ruta.
-              Dirígete al punto de partida o inicia de todos modos si ya te encuentras en ruta.
+              Tu posicion actual esta a mas de 500 m del inicio de la ruta.
+              Dirigete al punto de partida o inicia de todos modos si ya te encuentras en ruta.
             </p>
 
             <div className="flex gap-3">
@@ -697,13 +761,13 @@ export default function TrackingPage() {
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">
                   Motivo (opcional)
                 </label>
-                <input type="text" placeholder="Ej: Tráfico, falla mecánica..."
+                <input type="text" placeholder="Ej: Trafico, falla mecanica..."
                   value={delayReason} onChange={(e) => setDelayReason(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
               <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
-                Los ciudadanos de tu zona recibirán una notificación inmediata.
+                Los ciudadanos de tu zona recibiran una notificacion inmediata.
               </p>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setShowDelayModal(false)}

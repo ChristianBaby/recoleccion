@@ -94,6 +94,35 @@ export async function sendIncidentStatusEmail(
   )
 }
 
+export async function sendRouteDelayEmail(
+  to: string,
+  firstName: string,
+  routeName: string,
+  delayMinutes: number,
+  reason?: string,
+) {
+  await sendMail(
+    to,
+    'Alerta de retraso en ruta de recoleccion',
+    baseTemplate(`
+      <h2 style="color:#1e293b;font-size:18px;margin:0 0 16px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Retraso en la recoleccion</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        Estimado(a) <strong>${firstName}</strong>, le informamos que la ruta de recoleccion asignada a su zona presenta una demora.
+      </p>
+      <div style="background:#fffbeb;border-radius:6px;padding:20px;margin:0 0 24px;border:1px solid #fde68a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        <p style="margin:0 0 4px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">Ruta</p>
+        <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#1e293b;">${routeName}</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">Retraso estimado</p>
+        <p style="margin:0 0 16px;font-size:15px;font-weight:700;color:#b45309;">${delayMinutes} minutos</p>
+        ${reason ? `<p style="margin:0 0 4px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">Motivo</p><p style="margin:0;font-size:14px;color:#475569;">${reason}</p>` : ''}
+      </div>
+      <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        Evite sacar sus residuos hasta que la ruta se normalice.
+      </p>
+    `),
+  )
+}
+
 // ─── Templates HTML ───────────────────────────────────────────────────────────
 
 function baseTemplate(content: string): string {

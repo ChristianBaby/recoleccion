@@ -55,6 +55,7 @@ export default function RegisterPage() {
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [zones, setZones] = useState<Zone[]>([])
   const [zoneState, setZoneState] = useState<ZoneState>({ status: 'none' })
+  const [selectedPoint, setSelectedPoint] = useState<{ lat: number; lng: number } | null>(null)
 
   const { register, handleSubmit, watch, trigger, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -73,12 +74,38 @@ export default function RegisterPage() {
       .catch(() => {})
   }, [])
 
+  function getPolygonCenter(coordinates: [number, number][][]): [number, number] {
+    const points = coordinates[0]
+    let sumLat = 0
+    let sumLng = 0
+    points.forEach(([lng, lat]) => {
+      sumLat += lat
+      sumLng += lng
+    })
+    return [sumLat / points.length, sumLng / points.length]
+  }
+
+  function handleSelectZoneFromList(zoneId: string) {
+    if (!zoneId) {
+      setZoneState({ status: 'none' })
+      setSelectedPoint(null)
+      return
+    }
+    const zone = zones.find(z => z.id === zoneId)
+    if (zone) {
+      const [lat, lng] = getPolygonCenter(zone.geometry.coordinates)
+      setZoneState({ status: 'found', zone, lat, lng })
+      setSelectedPoint({ lat, lng })
+    }
+  }
+
   function handleZoneDetected(zone: Zone | null, lat: number, lng: number) {
     if (zone) {
       setZoneState({ status: 'found', zone, lat, lng })
     } else {
       setZoneState({ status: 'invalid', lat, lng })
     }
+    setSelectedPoint({ lat, lng })
   }
 
   async function goToStep2() {
@@ -109,7 +136,7 @@ export default function RegisterPage() {
   if (registered) {
     return (
       <div className="text-center space-y-6 py-8">
-        <CheckCircle size={64} className="text-green-500 mx-auto" />
+        <CheckCircle size={64} className="text-teal-600 mx-auto" />
         <div>
           <h2 className="text-2xl font-bold text-slate-900">¡Registro exitoso!</h2>
           <p className="text-slate-500 mt-2 text-sm leading-relaxed">
@@ -117,19 +144,19 @@ export default function RegisterPage() {
             <strong className="text-slate-700">{registeredEmail}</strong>
           </p>
           {zoneState.status === 'found' && (
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 text-teal-800 rounded-full text-xs font-medium">
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 text-teal-805 rounded-full text-xs font-medium">
               <MapPin size={12} /> Zona asignada: {zoneState.zone.name}
             </div>
           )}
           {zoneState.status === 'invalid' && (
-            <p className="text-amber-600 text-xs mt-2">
+            <p className="text-amber-650 text-xs mt-2">
               Tu ubicación no pertenece a una zona registrada. El administrador te asignará una.
             </p>
           )}
         </div>
         <button
           onClick={() => router.push('/login')}
-          className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm transition-colors"
+          className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-lg text-sm transition-colors"
         >
           Ir al inicio de sesión
         </button>
@@ -138,15 +165,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className={(step === 2 && !registered) ? "lg:-mx-40 lg:max-w-4xl lg:w-[850px] transition-all duration-350 space-y-5" : "transition-all duration-350 space-y-5"}>
       <div>
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-bold text-slate-900">Crear cuenta</h1>
           <span className="text-xs text-slate-400 font-medium">Paso {step} de 2</span>
         </div>
         <div className="flex gap-1 mb-3">
-          <div className="h-1 flex-1 rounded-full bg-green-500" />
-          <div className={`h-1 flex-1 rounded-full ${step === 2 ? 'bg-green-500' : 'bg-slate-200'}`} />
+          <div className="h-1 flex-1 rounded-full bg-teal-700" />
+          <div className={`h-1 flex-1 rounded-full ${step === 2 ? 'bg-teal-700' : 'bg-slate-200'}`} />
         </div>
         <p className="text-slate-500 text-sm">
           {step === 1 ? 'Datos personales' : 'Selecciona tu ubicación en el mapa'}
@@ -230,66 +257,152 @@ export default function RegisterPage() {
 
         {/* ── Step 2: Zone map ─────────────────────────────────── */}
         {step === 2 && (
-          <div className="space-y-3">
-            {/* Zone status banner */}
-            {zoneState.status === 'found' && (
-              <div className="flex items-center gap-2 p-3 bg-teal-50 border border-teal-200 rounded-lg text-sm">
-                <MapPin size={16} className="text-teal-700 shrink-0" />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
+              
+              {/* Columna Izquierda: Selector de Zona en Lista */}
+              <div className="lg:col-span-2 flex flex-col justify-between space-y-4">
                 <div>
-                  <p className="font-semibold text-teal-900">Zona detectada: {zoneState.zone.name}</p>
-                  <p className="text-teal-700 text-xs">{zoneState.zone.district}</p>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2.5">
+                    Selecciona tu Barrio / Urbanización
+                  </label>
+                  
+                  <div className="space-y-2 max-h-[290px] overflow-y-auto pr-1">
+                    {/* Opción de no asignar o no en la lista */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectZoneFromList('')}
+                      className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                        zoneState.status === 'none' || zoneState.status === 'invalid'
+                          ? 'border-slate-850 bg-slate-50 ring-2 ring-slate-800/10'
+                          : 'border-slate-205 hover:border-slate-400 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block" />
+                        No estoy seguro / No está en la lista
+                      </div>
+                      <p className="text-slate-500 text-[10px] leading-relaxed">
+                        Puedes registrarte sin zona; el administrador te asignará una manualmente más tarde.
+                      </p>
+                    </button>
+
+                    {/* Zonas activas del sistema */}
+                    {zones.filter(z => z.isActive).map((z) => {
+                      const isSelected = zoneState.status === 'found' && zoneState.zone.id === z.id
+                      return (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() => handleSelectZoneFromList(z.id)}
+                          className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                            isSelected
+                              ? 'bg-teal-50/40 border-teal-800 ring-2 ring-teal-700/10'
+                              : 'border-slate-205 hover:border-slate-400 bg-white'
+                          }`}
+                          style={{ borderLeftWidth: '5px', borderLeftColor: z.color }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900">{z.name}</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">{z.district}</span>
+                          </div>
+                          {z.description && (
+                            <p className="text-slate-500 text-[10px] leading-normal line-clamp-2">
+                              {z.description}
+                            </p>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div className="ml-auto w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: zoneState.zone.color }} />
-              </div>
-            )}
 
-            {zoneState.status === 'invalid' && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-                <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-amber-800">Zona no válida</p>
-                  <p className="text-amber-700 text-xs">
-                    Tu ubicación no pertenece a ninguna zona registrada. Puedes seleccionar otro punto
-                    o registrarte así y el administrador te asignará una zona.
-                  </p>
+                {/* Banner de estado de zona actual */}
+                <div className="pt-2">
+                  {zoneState.status === 'found' && (
+                    <div className="flex items-start gap-2.5 p-3.5 bg-teal-50/50 border border-teal-150 rounded-xl text-xs">
+                      <MapPin size={16} className="text-teal-700 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-teal-900">Ubicación Asignada con Éxito</p>
+                        <p className="text-teal-800 text-[10px] mt-0.5 leading-normal">
+                          Perteneces a la zona <span className="font-bold text-teal-950">{zoneState.zone.name}</span>. Verás los horarios de esta zona en tu dashboard.
+                        </p>
+                      </div>
+                      <div className="w-3.5 h-3.5 rounded-full border border-white shrink-0 shadow-sm" style={{ backgroundColor: zoneState.zone.color }} />
+                    </div>
+                  )}
+
+                  {zoneState.status === 'invalid' && (
+                    <div className="flex items-start gap-2.5 p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl text-xs">
+                      <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-bold text-amber-850">Ubicación Fuera de Cobertura</p>
+                        <p className="text-amber-700 text-[10px] mt-0.5 leading-normal">
+                          El punto marcado está fuera de las zonas registradas. El administrador revisará tu dirección para asignarte la zona correcta.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {zoneState.status === 'none' && (
+                    <div className="flex items-start gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5 animate-bounce" />
+                      <div className="flex-1">
+                        <p className="font-bold text-slate-700">Sin Zona Seleccionada</p>
+                        <p className="text-slate-500 text-[10px] mt-0.5 leading-normal">
+                          Haz clic en cualquier punto del mapa para geolocalizar tu domicilio o elige tu barrio de la lista de arriba.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
 
-            {zoneState.status === 'none' && (
-              <p className="text-xs text-slate-500 text-center">
-                Haz clic en el mapa o usa el botón GPS para seleccionar tu ubicación
-              </p>
-            )}
+              {/* Columna Derecha: Mapa de Zonas */}
+              <div className="lg:col-span-3 h-[380px] rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative">
+                <LeafletRegisterMap 
+                  zones={zones} 
+                  selectedZoneId={zoneState.status === 'found' ? zoneState.zone.id : null}
+                  selectedPoint={selectedPoint}
+                  onZoneDetected={handleZoneDetected} 
+                />
+              </div>
 
-            {/* Map */}
-            <div className="h-72 rounded-xl overflow-hidden border border-slate-200">
-              <LeafletRegisterMap zones={zones} onZoneDetected={handleZoneDetected} />
             </div>
 
-            <div className="flex gap-2">
+            {/* Botones de acción */}
+            <div className="flex gap-3 pt-3 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-600
-                  border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold tracking-wider text-slate-655
+                  border border-slate-300 bg-white rounded-lg hover:bg-slate-50 uppercase transition-colors"
               >
                 <ArrowLeft size={15} /> Atrás
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700
-                  hover:bg-teal-800 disabled:bg-teal-400 text-white font-semibold rounded-lg
-                  transition-colors text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-teal-700
+                  hover:bg-teal-800 disabled:bg-teal-400 text-white font-bold uppercase tracking-wider rounded-lg
+                  transition-colors text-xs shadow-sm"
               >
-                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                {isSubmitting ? 'Registrando...' : 'Crear cuenta'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Registrando...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={15} />
+                    Finalizar Registro
+                  </>
+                )}
               </button>
             </div>
 
-            <p className="text-xs text-center text-slate-400">
-              La selección de zona en el mapa es opcional pero recomendada
+            <p className="text-[10px] text-center text-slate-400">
+              * La geolocalización nos permite enviarte notificaciones en tiempo real cuando el camión de basura se aproxime a tu casa.
             </p>
           </div>
         )}

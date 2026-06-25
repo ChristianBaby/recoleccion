@@ -264,14 +264,16 @@ export async function getCitizenParticipation(filters: { from?: string; to?: str
       role: 'CITIZEN',
       isActive: true,
       ...(filters.zoneId && { zoneId: filters.zoneId }),
+      ...(dateFilter && { createdAt: dateFilter }),
     },
   })
 
-  const totalIncidents = await prisma.incident.count(
-    filters.zoneId
-      ? { where: { citizen: { zoneId: filters.zoneId } } }
-      : undefined,
-  )
+  const totalIncidents = await prisma.incident.count({
+    where: {
+      ...(dateFilter && { createdAt: dateFilter }),
+      ...(filters.zoneId && { citizen: { zoneId: filters.zoneId } }),
+    },
+  })
 
   // RF-16: Consultas educativas — visitas a la página "Aprende a segregar"
   const learnVisitWhere = {

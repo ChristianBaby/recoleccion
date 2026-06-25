@@ -63,3 +63,30 @@ export async function track(req: Request, res: Response, next: NextFunction) {
     next(err)
   }
 }
+
+export async function update(req: Request, res: Response, next: NextFunction) {
+  try {
+    const incident = await incidentService.updateIncident(
+      req.params['id'] as string,
+      req.body,
+      req.user!.id,
+      req.user!.role,
+    )
+    ok(res, incident, 'Incidencia actualizada exitosamente')
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function remove(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await incidentService.deleteIncident(
+      req.params['id'] as string,
+      req.user!.id,
+      req.user!.role,
+    )
+    ok(res, result, 'Incidencia eliminada exitosamente')
+  } catch (err) {
+    next(err)
+  }
+}

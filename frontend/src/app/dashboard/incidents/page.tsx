@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { api, ApiError } from '@/lib/api'
 import type { ApiResponse, Incident, IncidentStatus } from '@/types'
@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import ZoneGuard from '@/components/ZoneGuard'
 import type { Zone } from '@/types'
 import { saveOfflineIncident, getOfflineIncidents, deleteOfflineIncident } from '@/lib/offlineDb'
+import { Pencil, Trash2, MapPin, X, MousePointerClick, CheckCircle2 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 
 const INCIDENT_TYPE_LABELS: Record<string, string> = {
   WASTE_ACCUMULATION: 'Acumulación de residuos',
@@ -43,16 +45,24 @@ const defaultForm: FormState = {
   lng: '',
 }
 
-export default function IncidentsPage() {
+function IncidentsPageContent() {
   const { accessToken, user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
 
+  const searchParams = useSearchParams()
   const [incidents, setIncidents] = useState<Incident[]>([])
+
+  useEffect(() => {
+    if (searchParams.get('create') === 'true' || searchParams.get('openModal') === 'true') {
+      setShowModal(true)
+    }
+  }, [searchParams])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<IncidentStatus | 'ALL'>('ALL')
   const [filterZoneId, setFilterZoneId] = useState('')
   const [zones, setZones] = useState<Zone[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [form, setForm] = useState<FormState>(defaultForm)
   const [saving, setSaving] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -321,12 +331,6 @@ export default function IncidentsPage() {
 
     setSaving(true)
 
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-      await handleOfflineSave()
-      setSaving(false)
-      return
-    }
-
     try {
       let imageUrl = form.imageUrl.trim()
 
@@ -335,8 +339,7 @@ export default function IncidentsPage() {
         try {
           imageUrl = await uploadToImgBB(imageFile)
         } catch {
-          toast.error('No se pudo subir la imagen. El reporte se enviará sin foto.')
-          imageUrl = ''
+          toast.error('No se pudo subir la imagen. Se guardará con la foto anterior o sin foto.')
         } finally {
           setUploadingImage(false)
         }
@@ -345,30 +348,41 @@ export default function IncidentsPage() {
       const payload: Record<string, unknown> = {
         type: form.type,
         description: form.description,
-      }
-      if (imageUrl) payload.imageUrl = imageUrl
-      if (form.address.trim()) payload.address = form.address.trim()
-      if (form.lat && form.lng) {
-        payload.lat = parseFloat(form.lat)
-        payload.lng = parseFloat(form.lng)
+        address: form.address.trim(),
+        lat: form.lat ? parseFloat(form.lat) : null,
+        lng: form.lng ? parseFloat(form.lng) : null,
+        imageUrl: imageUrl || null,
       }
 
-      const res = await api.post<ApiResponse<Incident>>('/incidents', payload, accessToken)
-      const created = res.data!
-      toast.success(
-        `Incidencia registrada — código: ${created.trackingCode}`,
-        { duration: 6000 },
-      )
-      setShowModal(false)
-      setForm(defaultForm)
-      removeImage()
+      if (editingIncident) {
+        // En edición, si el usuario es admin/operador y modificó el estado en el form,
+        // también lo incluimos en el payload.
+        if (isAdmin || user?.role === 'OPERATOR') {
+          payload.status = (form as any).status || editingIncident.status
+        }
+        await api.patch(`/incidents/${editingIncident.id}`, payload, accessToken)
+        toast.success('Incidencia actualizada exitosamente')
+      } else {
+        if (typeof window !== 'undefined' && !navigator.onLine) {
+          await handleOfflineSave()
+          setSaving(false)
+          return
+        }
+        const res = await api.post<ApiResponse<Incident>>('/incidents', payload, accessToken)
+        const created = res.data!
+        toast.success(
+          `Incidencia registrada — código: ${created.trackingCode}`,
+          { duration: 6000 },
+        )
+      }
+
+      closeModal()
       fetchIncidents()
     } catch (err) {
-      const isNetworkError = !(err instanceof ApiError)
-      if (isNetworkError) {
+      if (!editingIncident && !(err instanceof ApiError) && typeof window !== 'undefined' && !navigator.onLine) {
         await handleOfflineSave()
       } else {
-        toast.error(err instanceof ApiError ? err.message : 'Error al reportar')
+        toast.error(err instanceof ApiError ? err.message : 'Error al guardar la incidencia')
       }
     } finally {
       setSaving(false)
@@ -376,7 +390,8 @@ export default function IncidentsPage() {
   }
 
   async function handleStatusChange(incident: Incident, status: IncidentStatus) {
-    if (!accessToken || !isAdmin) return
+    const isStaff = isAdmin || user?.role === 'OPERATOR'
+    if (!accessToken || !isStaff) return
     setUpdatingId(incident.id)
     try {
       await api.patch(`/incidents/${incident.id}/status`, { status }, accessToken)
@@ -387,6 +402,41 @@ export default function IncidentsPage() {
     } finally {
       setUpdatingId(null)
     }
+  }
+
+  async function handleDelete(id: string) {
+    if (!accessToken) return
+    if (!window.confirm('¿Está seguro de que desea eliminar esta incidencia? Esta acción no se puede deshacer.')) return
+
+    try {
+      await api.delete(`/incidents/${id}`, accessToken)
+      toast.success('Incidencia eliminada exitosamente')
+      fetchIncidents()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Error al eliminar la incidencia')
+    }
+  }
+
+  function openEditModal(inc: Incident) {
+    setEditingIncident(inc)
+    setForm({
+      type: inc.type,
+      description: inc.description,
+      imageUrl: inc.imageUrl || '',
+      address: inc.address || '',
+      lat: inc.lat ? String(inc.lat) : '',
+      lng: inc.lng ? String(inc.lng) : '',
+      status: inc.status,
+    } as any)
+    setImagePreview(inc.imageUrl || null)
+    setShowModal(true)
+  }
+
+  function closeModal() {
+    setShowModal(false)
+    setEditingIncident(null)
+    setForm(defaultForm)
+    removeImage()
   }
 
   function copyCode(code: string) {
@@ -503,7 +553,7 @@ export default function IncidentsPage() {
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[800px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">
                     <th className="px-5 py-3.5">Código</th>
@@ -514,6 +564,7 @@ export default function IncidentsPage() {
                     <th className="px-5 py-3.5">Ubicación</th>
                     <th className="px-5 py-3.5">Fecha</th>
                     <th className="px-5 py-3.5">Estado</th>
+                    <th className="px-5 py-3.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
@@ -594,7 +645,7 @@ export default function IncidentsPage() {
 
                         {/* Status */}
                         <td className="px-5 py-4">
-                          {isAdmin ? (
+                          {(isAdmin || user?.role === 'OPERATOR') ? (
                             <div className="relative inline-block text-left">
                               <select
                                 value={inc.status}
@@ -618,6 +669,42 @@ export default function IncidentsPage() {
                             </span>
                           )}
                         </td>
+
+                        {/* Actions */}
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2.5">
+                            {inc.lat && inc.lng ? (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${inc.lat},${inc.lng}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors inline-block"
+                                title="Ver en Google Maps"
+                              >
+                                <MapPin size={14} />
+                              </a>
+                            ) : null}
+
+                            {(isAdmin || user?.role === 'OPERATOR' || (user?.role === 'CITIZEN' && inc.status === 'OPEN' && inc.citizenId === user.id)) ? (
+                              <>
+                                <button
+                                  onClick={() => openEditModal(inc)}
+                                  className="p-1.5 text-slate-400 hover:text-amber-600 transition-colors"
+                                  title="Editar"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(inc.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -628,22 +715,27 @@ export default function IncidentsPage() {
         )}
       </div>
 
-      {/* Modal: Reportar incidencia */}
+      {/* Modal: Crear/Editar incidencia */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-              <h2 className="font-semibold text-slate-900 text-sm">REPORTAR INCIDENCIA</h2>
+              <h2 className="font-bold text-slate-900 text-xs tracking-wider uppercase">
+                {editingIncident ? 'Editar incidencia' : 'Reportar incidencia'}
+              </h2>
               <button 
-                onClick={() => { setShowModal(false); removeImage() }} 
+                onClick={closeModal} 
                 className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-400 hover:text-slate-900 uppercase transition-colors"
               >
                 Cerrar
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-              <div className="px-6 py-5 space-y-4">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+              {/* Fields Container (Scrollable) */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
                 {/* Type */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">Tipo de incidencia *</label>
@@ -673,6 +765,23 @@ export default function IncidentsPage() {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 resize-none transition-colors"
                   />
                 </div>
+
+                {/* Status (Edit mode & Admin/Operator only) */}
+                {editingIncident && (isAdmin || user?.role === 'OPERATOR') && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">Estado *</label>
+                    <select
+                      value={(form as any).status || editingIncident.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value } as any)}
+                      required
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:border-slate-800 bg-white transition-colors"
+                    >
+                      {STATUS_ORDER.map((s) => (
+                        <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Location */}
                 <div>
@@ -735,43 +844,49 @@ export default function IncidentsPage() {
                   )}
                 </div>
 
-                {/* Advertencia Ético-Legal (Privacidad) */}
-                <div className="bg-slate-50 border border-slate-200 rounded p-4 text-[10px] text-slate-600 leading-relaxed">
-                  <span className="font-bold uppercase tracking-wider text-slate-900 block mb-1">Aviso de Privacidad (Ley N.º 29733):</span>
-                  Al capturar la fotografía, evite registrar rostros de personas o placas de vehículos ajenos para proteger los datos personales de terceros.
-                </div>
+                {/* Advertencia Ético-Legal y Consentimiento (Create mode only) */}
+                {!editingIncident && (
+                  <>
+                    {/* Advertencia Ético-Legal (Privacidad) */}
+                    <div className="bg-slate-50 border border-slate-200 rounded p-4 text-[10px] text-slate-650 leading-relaxed">
+                      <span className="font-bold uppercase tracking-wider text-slate-900 block mb-1">Aviso de Privacidad (Ley N.º 29733):</span>
+                      Al capturar la fotografía, evite registrar rostros de personas o placas de vehículos ajenos para proteger los datos personales de terceros.
+                    </div>
 
-                {/* Consentimiento obligatorio */}
-                <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
-                  <input
-                    type="checkbox"
-                    id="termsConsent"
-                    required
-                    className="mt-1 h-4 w-4 text-amber-600 border-slate-350 rounded focus:ring-amber-500 cursor-pointer accent-amber-600"
-                  />
-                  <label htmlFor="termsConsent" className="text-[10px] text-slate-550 select-none leading-relaxed cursor-pointer font-medium">
-                    Doy mi consentimiento para el tratamiento de mis datos personales y autorizo el acceso a mi ubicación GPS con el único fin de procesar esta incidencia conforme a la <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-amber-700 hover:text-amber-900 hover:underline font-bold inline-flex items-center gap-1">Política de Privacidad<svg className="w-3 h-3 inline-block shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg><span className="sr-only">(se abre en una nueva pestaña)</span></a> de la Ley N.º 29733. *
-                  </label>
-                </div>
+                    {/* Consentimiento obligatorio */}
+                    <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
+                      <input
+                        type="checkbox"
+                        id="termsConsent"
+                        required
+                        className="mt-1 h-4 w-4 text-amber-600 border-slate-350 rounded focus:ring-amber-500 cursor-pointer accent-amber-600"
+                      />
+                      <label htmlFor="termsConsent" className="text-[10px] text-slate-550 select-none leading-relaxed cursor-pointer font-medium">
+                        Doy mi consentimiento para el tratamiento de mis datos personales y autorizo el acceso a mi ubicación GPS con el único fin de procesar esta incidencia conforme a la <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-amber-700 hover:text-amber-900 hover:underline font-bold inline-flex items-center gap-1">Política de Privacidad<svg className="w-3 h-3 inline-block shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg><span className="sr-only">(se abre en una nueva pestaña)</span></a> de la Ley N.º 29733. *
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 shrink-0">
+              {/* Footer (Fixed) */}
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 shrink-0 bg-slate-50">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-bold tracking-wider text-slate-600 border border-slate-200 rounded hover:bg-slate-50 uppercase transition-colors"
+                  onClick={closeModal}
+                  className="px-4 py-2 text-xs font-bold tracking-wider text-slate-650 border border-slate-200 bg-white rounded hover:bg-slate-50 uppercase transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || uploadingImage}
-                  className="inline-flex items-center justify-center px-4 py-2 bg-amber-650 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-bold tracking-wider uppercase rounded transition-colors shadow-sm"
                 >
                   {saving || uploadingImage ? (
                     <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-2" />
                   ) : null}
-                  {uploadingImage ? 'Subiendo...' : saving ? 'Enviando...' : 'Enviar reporte'}
+                  {uploadingImage ? 'Subiendo...' : saving ? 'Guardando...' : editingIncident ? 'Guardar cambios' : 'Enviar reporte'}
                 </button>
               </div>
             </form>
@@ -779,5 +894,13 @@ export default function IncidentsPage() {
         </div>
       )}
     </ZoneGuard>
+  )
+}
+
+export default function IncidentsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Cargando incidencias...</div>}>
+      <IncidentsPageContent />
+    </Suspense>
   )
 }

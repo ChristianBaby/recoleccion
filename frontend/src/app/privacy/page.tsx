@@ -1,9 +1,35 @@
 'use client'
 
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { Shield, ArrowLeft, Lock, FileText, CheckCircle2 } from 'lucide-react'
 
 export default function PrivacyPolicyPage() {
+  const router = useRouter()
+  const { accessToken } = useAuth()
+
+  const handleBack = () => {
+    // Si hay un historial previo en la misma pestaña del navegador, retrocedemos
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      // Esperamos un breve instante para validar si retrocedió. Si sigue en la misma página (por ser pestaña nueva),
+      // aplicamos el redireccionamiento de fallback.
+      setTimeout(() => {
+        if (accessToken) {
+          router.push('/dashboard')
+        } else {
+          router.push('/register')
+        }
+      }, 100)
+    } else {
+      if (accessToken) {
+        router.push('/dashboard')
+      } else {
+        router.push('/register')
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -12,12 +38,12 @@ export default function PrivacyPolicyPage() {
           <div className="absolute top-4 right-4 text-white/5">
             <Shield size={120} />
           </div>
-          <Link
-            href="/register"
+          <button
+            onClick={handleBack}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-100 hover:text-white mb-6 transition-colors bg-white/10 px-3 py-1.5 rounded-full"
           >
-            <ArrowLeft size={12} /> Volver al registro
-          </Link>
+            <ArrowLeft size={12} /> Volver
+          </button>
           <h1 className="text-3xl font-extrabold tracking-tight">Política de Privacidad</h1>
           <p className="text-teal-100 mt-2 text-sm max-w-xl">
             Tratamiento de datos personales en el Sistema Inteligente de Recolección de Residuos Sólidos Segregados.

@@ -6,7 +6,7 @@ import { getSocket } from '@/lib/socket'
 import { Bell, Truck, X, Clock } from 'lucide-react'
 
 interface ProximityAlert {
-  operatorName: string
+  vehicleCode: string
   distance: number
   zoneId: string
   timestamp: string
@@ -73,13 +73,6 @@ export default function ProximityAlertListener() {
   }, [accessToken, user?.role])
 
   // Solicitar permiso de notificación del navegador una sola vez
-  useEffect(() => {
-    if (user?.role !== 'CITIZEN') return
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {})
-    }
-  }, [user?.role])
-
   if (!banner) return null
 
   return (
@@ -106,7 +99,7 @@ export default function ProximityAlertListener() {
               Prepara tus residuos para entregarlos.
             </p>
             <p className="text-emerald-200 text-xs mt-1">
-              Operador: {banner.data.operatorName} ·{' '}
+              Vehiculo: {banner.data.vehicleCode} ·{' '}
               {new Date(banner.data.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </>
@@ -141,13 +134,9 @@ export default function ProximityAlertListener() {
 }
 
 export function NotificationPermissionButton() {
-  const [permission, setPermission] = useState<NotificationPermission>('default')
-
-  useEffect(() => {
-    if (typeof Notification !== 'undefined') {
-      setPermission(Notification.permission)
-    }
-  }, [])
+  const [permission, setPermission] = useState<NotificationPermission>(() => (
+    typeof Notification === 'undefined' ? 'denied' : Notification.permission
+  ))
 
   if (permission !== 'default') return null
 

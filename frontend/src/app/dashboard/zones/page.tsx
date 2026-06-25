@@ -63,12 +63,22 @@ export default function ZonesPage() {
   const [form, setForm] = useState<FormState>(defaultForm)
   const [saving, setSaving] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [zoneToDelete, setZoneToDelete] = useState<Zone | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [activeTab, setActiveTab] = useState<'list' | 'map'>('list')
 
   const fetchZones = useCallback(async () => {
     if (!accessToken) return
     try {
       const res = await api.get<ApiResponse<Zone[]>>('/zones', accessToken)
-      setZones(res.data ?? [])
+      const data = res.data ?? []
+      setZones(data)
+      setSelectedZone((prev) => {
+        if (!prev) return null
+        const updated = data.find((z) => z.id === prev.id)
+        return updated ?? null
+      })
     } catch {
       toast.error('Error al cargar las zonas')
     } finally {
@@ -148,17 +158,24 @@ export default function ZonesPage() {
     }
   }
 
-  async function handleDelete(zone: Zone) {
-    if (!accessToken) return
-    const confirmed = window.confirm(`¿Estás seguro de que deseas eliminar la zona "${zone.name}"? Esta acción desvinculará a los ciudadanos y eliminará todas las rutas y datos asociados de forma irreversible.`)
-    if (!confirmed) return
+  function handleDelete(zone: Zone) {
+    setZoneToDelete(zone)
+    setShowDeleteConfirm(true)
+  }
 
+  async function confirmDelete() {
+    if (!accessToken || !zoneToDelete) return
+    setDeleting(true)
     try {
-      await api.delete(`/zones/${zone.id}`, accessToken)
+      await api.delete(`/zones/${zoneToDelete.id}`, accessToken)
       toast.success('Zona eliminada exitosamente')
+      setShowDeleteConfirm(false)
+      setZoneToDelete(null)
       fetchZones()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Error al eliminar la zona')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -185,10 +202,38 @@ export default function ZonesPage() {
         )}
       </div>
 
+      {/* Mobile tabs */}
+      <div className="flex md:hidden border-b border-slate-200 bg-white shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('list')}
+          className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            activeTab === 'list'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          Lista de Zonas
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('map')}
+          className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            activeTab === 'map'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-400'
+          }`}
+        >
+          Mapa
+        </button>
+      </div>
+
       {/* Content: list + map */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Zone list */}
-        <div className="w-80 border-r border-slate-200 overflow-y-auto bg-white shrink-0">
+        <div className={`w-full md:w-80 md:border-r border-slate-200 overflow-y-auto bg-white shrink-0 md:block ${
+          activeTab === 'list' ? 'block h-full' : 'hidden'
+        }`}>
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 size={24} className="animate-spin text-slate-300" />
@@ -205,78 +250,97 @@ export default function ZonesPage() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {zones.map((zone) => (
-                <li
-                  key={zone.id}
-                  onClick={() => setSelectedZone(zone.id === selectedZone?.id ? null : zone)}
-                  className={`px-4 py-3 cursor-pointer transition-colors ${
-                    selectedZone?.id === zone.id ? 'bg-emerald-50' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: zone.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-slate-900 truncate">
-                          {zone.name}
-                        </span>
-                        <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                          zone.isActive
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {zone.isActive ? 'Activa' : 'Inactiva'}
-                        </span>
+              {zones.map((zone) => {
+                const isSelected = selectedZone?.id === zone.id
+                return (
+                  <li
+                    key={zone.id}
+                    onClick={() => setSelectedZone(isSelected ? null : zone)}
+                    className={`px-4 py-3 cursor-pointer transition-all border-l-4 ${
+                      isSelected
+                        ? zone.isActive
+                          ? 'bg-emerald-50/70 border-emerald-500'
+                          : 'bg-slate-100 border-slate-400'
+                        : zone.isActive
+                          ? 'border-transparent hover:bg-slate-50'
+                          : 'border-transparent bg-slate-50/40 hover:bg-slate-100/50'
+                    } ${!zone.isActive ? 'opacity-70' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: zone.color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-900 truncate">
+                            {zone.name}
+                          </span>
+                          <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
+                            zone.isActive
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-100'
+                          }`}>
+                            {zone.isActive ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 truncate">{zone.district}</p>
+                        {zone.description && (
+                          <p className="text-xs text-slate-500 truncate mt-0.5" title={zone.description}>
+                            {zone.description}
+                          </p>
+                        )}
+                        {zone._count && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {zone._count.users} ciudadanos · {zone._count.routes} rutas
+                          </p>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-400 truncate">{zone.district}</p>
-                      {zone.description && (
-                        <p className="text-xs text-slate-500 truncate mt-0.5" title={zone.description}>
-                          {zone.description}
-                        </p>
-                      )}
-                      {zone._count && (
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {zone._count.users} ciudadanos · {zone._count.routes} rutas
-                        </p>
+                      {isAdmin && (
+                        <div className="flex gap-0.5 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openEdit(zone) }}
+                            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400"
+                            title="Editar"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleToggle(zone) }}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              zone.isActive
+                                ? 'text-emerald-600 hover:bg-emerald-100/50'
+                                : 'text-slate-400 hover:bg-slate-200/50'
+                            }`}
+                            title={zone.isActive ? 'Desactivar' : 'Activar'}
+                          >
+                            {zone.isActive ? (
+                              <ToggleRight size={18} className="text-emerald-500" />
+                            ) : (
+                              <ToggleLeft size={18} className="text-slate-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(zone) }}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       )}
                     </div>
-                    {isAdmin && (
-                      <div className="flex gap-0.5 shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openEdit(zone) }}
-                          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400"
-                          title="Editar"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggle(zone) }}
-                          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400"
-                          title={zone.isActive ? 'Desactivar' : 'Activar'}
-                        >
-                          {zone.isActive ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(zone) }}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
 
         {/* Map */}
-        <div className="flex-1 p-4">
+        <div className={`flex-1 p-2 md:p-4 md:block ${
+          activeTab === 'map' ? 'block h-full' : 'hidden'
+        }`}>
           <LeafletZoneMap
             zones={zones}
             selectedZoneId={selectedZone?.id}
@@ -286,8 +350,8 @@ export default function ZonesPage() {
             {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col overflow-hidden border border-slate-100"
-            style={{ height: 'min(90vh, 700px)' }}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col overflow-y-auto md:overflow-hidden border border-slate-100"
+            style={{ height: 'min(95vh, 700px)' }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-slate-50 shrink-0">
@@ -306,10 +370,10 @@ export default function ZonesPage() {
             </div>
 
             {/* Body: Split screen (form left, map right) */}
-            <form onSubmit={handleSubmit} className="flex-1 flex flex-row overflow-hidden bg-slate-50">
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden bg-slate-50">
 
               {/* Form Side (Left) */}
-              <div className="w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden shrink-0 shadow-sm">
+              <div className="w-full md:w-96 bg-white md:border-r border-slate-200 flex flex-col md:overflow-hidden shrink-0 shadow-sm">
                 <div className="px-6 py-6 space-y-6 flex-1 overflow-y-auto scrollbar-thin">
                   
                   <div>
@@ -494,7 +558,7 @@ export default function ZonesPage() {
               </div>
 
               {/* Map Side (Right) */}
-              <div className="flex-1 h-full relative">
+              <div className="w-full h-80 md:h-full md:flex-1 relative shrink-0 border-t md:border-t-0 border-slate-200">
                 <LeafletPolygonEditor
                   vertices={form.vertices}
                   onChange={(v) => setForm({ ...form, vertices: v })}
@@ -506,6 +570,52 @@ export default function ZonesPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && zoneToDelete && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm transition-all animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            {/* Warning Icon */}
+            <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-4 animate-bounce">
+              <Trash2 size={24} />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900">
+              ¿Eliminar zona de recolección?
+            </h3>
+            
+            <p className="text-xs text-slate-500 mt-2.5 mb-6 leading-relaxed">
+              ¿Estás seguro de que deseas eliminar la zona <strong className="text-slate-800 font-semibold">"{zoneToDelete.name}"</strong>? Esta acción desvinculará a los ciudadanos y eliminará todas las rutas y datos asociados de forma irreversible.
+            </p>
+
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setZoneToDelete(null)
+                }}
+                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 font-semibold rounded-xl text-sm transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-98 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/10"
+              >
+                {deleting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  'Eliminar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   )

@@ -20,6 +20,51 @@ export async function listRoutes(filters?: { zoneId?: string; status?: string })
   })
 }
 
+export async function getCitizenSchedule(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, zoneId: true, district: true },
+  })
+  if (!user) throw { status: 404, message: 'Usuario no encontrado' }
+
+  let source: 'ASSIGNED_ZONE' | 'POROY_REFERENCE' = 'ASSIGNED_ZONE'
+  let zoneId = user.zoneId
+  let message: string | undefined
+
+  if (!zoneId) {
+    const fallbackZone = await prisma.zone.findFirst({
+      where: { district: { equals: user.district ?? 'Poroy', mode: 'insensitive' }, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
+    if (!fallbackZone) {
+      return {
+        source: 'POROY_REFERENCE' as const,
+        zoneId: null,
+        routes: [],
+        message: 'Tu zona esta en revision por el administrador. Aun no hay una zona activa de referencia para tu distrito.',
+      }
+    }
+
+    source = 'POROY_REFERENCE'
+    zoneId = fallbackZone.id
+    message = `Tu zona esta en revision por el administrador. Mostramos como referencia general la zona activa ${fallbackZone.name}.`
+  }
+
+  const routes = await prisma.route.findMany({
+    where: { zoneId, status: 'ACTIVE' },
+    include: {
+      zone: { select: { id: true, name: true, color: true } },
+      vehicle: { select: { id: true, plate: true, type: true } },
+      _count: { select: { waypoints: true } },
+    },
+    orderBy: [{ startTime: 'asc' }, { name: 'asc' }],
+  })
+
+  return { source, zoneId, routes, message }
+}
+
 // ─── RF-09: Obtener ruta ──────────────────────────────────────────────────────
 
 export async function getRoute(id: string) {

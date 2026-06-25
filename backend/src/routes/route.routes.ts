@@ -10,6 +10,7 @@ router.use(requireAuth)
 
 // RF-09: Cualquier usuario autenticado puede ver rutas
 router.get('/', ctrl.list)
+router.get('/my-schedule', requireRole('CITIZEN'), ctrl.mySchedule)
 router.get('/operators', requireRole('ADMIN'), ctrl.operators)
 router.get('/:id', ctrl.getById)
 

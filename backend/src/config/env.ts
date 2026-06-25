@@ -12,7 +12,10 @@ export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isDev: (process.env.NODE_ENV ?? 'development') === 'development',
 
-  frontendUrl: (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/^['"]|['"]$/g, '').trim(),
+  frontendUrl: (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+    .replace(/^['"]|['"]$/g, '')
+    .split(',')[0]
+    .trim(),
 
   jwt: {
     accessSecret: required('JWT_ACCESS_SECRET'),

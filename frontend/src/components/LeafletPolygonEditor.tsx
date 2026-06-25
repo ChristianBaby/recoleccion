@@ -28,7 +28,8 @@ function MapAutoCenter({ vertices, otherZones = [] }: { vertices: [number, numbe
     // 1. Si estamos editando una zona existente con vértices
     if (vertices && vertices.length >= 3) {
       const bounds = L.latLngBounds(vertices)
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: true, duration: 1.2 })
+      map.stop()
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: false })
     }
     // 2. Si es una nueva zona y hay otras zonas registradas, centramos en ellas combinadamente
     else if (otherZones && otherZones.length > 0) {
@@ -41,10 +42,14 @@ function MapAutoCenter({ vertices, otherZones = [] }: { vertices: [number, numbe
 
       if (allPoints.length > 0) {
         const bounds = L.latLngBounds(allPoints)
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: true, duration: 1.2 })
+        map.stop()
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: false })
       }
     }
-  }, [map]) // Se ejecuta una sola vez cuando se inicializa el mapa con los vértices
+    return () => {
+      map.stop()
+    }
+  }, [map, vertices, otherZones])
 
   return null
 }
@@ -57,7 +62,8 @@ function CenterButton({ vertices }: { vertices: [number, number][] }) {
 
   function handleCenter() {
     const bounds = L.latLngBounds(vertices)
-    map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1.0 })
+    map.stop()
+    map.fitBounds(bounds, { padding: [50, 50], animate: false })
   }
 
   return (
@@ -115,7 +121,15 @@ export default function LeafletPolygonEditor({ vertices, onChange, otherZones = 
 
   return (
     <div className="relative w-full h-full min-h-[400px] bg-slate-50">
-      <MapContainer center={CUSCO_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} doubleClickZoom={false}>
+      <MapContainer
+        center={CUSCO_CENTER}
+        zoom={13}
+        style={{ height: '100%', width: '100%' }}
+        doubleClickZoom={false}
+        zoomAnimation={false}
+        fadeAnimation={false}
+        markerZoomAnimation={false}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
