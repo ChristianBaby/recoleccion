@@ -18,37 +18,57 @@ app.set('trust proxy', 1)
 // ─── Seguridad ────────────────────────────────────────────────────────────────
 app.use(helmet())
 
-const allowedOrigins = env.frontendUrl
+const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
   .split(',')
   .map((u) => u.trim().replace(/^['"]|['"]$/g, ''))
   .filter(Boolean)
 
+function isAllowedOrigin(origin: string) {
+  return allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    // Permitir cualquier subdominio de vercel.app (previews de Vercel)
-    if (origin.endsWith('.vercel.app')) return callback(null, true)
+    if (isAllowedOrigin(origin)) return callback(null, true)
     console.warn(`[CORS] Origen bloqueado: ${origin} | Permitidos: ${allowedOrigins.join(', ')}`)
     callback(null, false)
   },
   credentials: true,
 }))
 
-// Rate limiting global
+// Rate limiting global — OPTIONS siempre pasa (preflight CORS)
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: { success: false, message: 'Demasiadas solicitudes. Intenta en 15 minutos.' },
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
+  handler: (req, res) => {
+    const origin = req.headers.origin as string | undefined
+    if (origin && isAllowedOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
+    res.status(429).json({ success: false, message: 'Demasiadas solicitudes. Intenta en 15 minutos.' })
+  },
 }))
 
 // Rate limiting estricto para auth
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
-  message: { success: false, message: 'Demasiados intentos de autenticación. Intenta en 15 minutos.' },
+  skip: (req) => req.method === 'OPTIONS',
+  handler: (req, res) => {
+    const origin = req.headers.origin as string | undefined
+    if (origin && isAllowedOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
+    res.status(429).json({ success: false, message: 'Demasiados intentos de autenticación. Intenta en 15 minutos.' })
+  },
 })
 app.use('/api/v1/auth/login', authLimiter)
 app.use('/api/v1/auth/register', authLimiter)
