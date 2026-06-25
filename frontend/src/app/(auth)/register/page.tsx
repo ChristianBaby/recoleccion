@@ -206,18 +206,20 @@ export default function RegisterPage() {
               <input type="tel" placeholder="987654321" inputMode="numeric" {...register('phone')} className={inputCls(!!errors.phone)} />
             </Field>
 
-            <div className="space-y-1 py-1">
-              <label className="flex items-start gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  {...register('consent')}
-                  className="mt-1 accent-green-600 rounded"
-                />
-                <span className="text-xs text-slate-500 leading-tight">
-                  Acepto el tratamiento de mis datos personales para la gestión del servicio de recolección de residuos sólidos, conforme a la <strong>Ley N.º 29733 (Ley de Protección de Datos Personales)</strong> y a la <Link href="/privacy" target="_blank" className="text-green-600 hover:underline">Política de Privacidad</Link>.
-                </span>
-              </label>
-              {errors.consent && <p className="text-xs text-red-600">{errors.consent.message}</p>}
+            <div className="space-y-1">
+              <div className="bg-green-50/40 border border-green-100 rounded-xl p-3.5 transition-all hover:bg-green-50/60">
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    {...register('consent')}
+                    className="mt-1 w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500 accent-green-600 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-600 leading-relaxed">
+                    Acepto el tratamiento de mis datos personales para la gestión del servicio de recolección de residuos, conforme a la <strong>Ley N.º 29733 (Ley de Protección de Datos Personales)</strong> y a la <Link href="/privacy" target="_blank" className="text-green-600 hover:underline font-semibold">Política de Privacidad</Link>.
+                  </span>
+                </label>
+              </div>
+              {errors.consent && <p className="text-xs text-red-600 pl-1">{errors.consent.message}</p>}
             </div>
 
             <button
