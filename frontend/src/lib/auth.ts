@@ -56,3 +56,18 @@ export function clearSession() {
 export function getDashboardPath(_role: string): string {
   return '/dashboard'
 }
+
+export function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const payloadBase64 = parts[1]
+    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+    const payloadJson = atob(base64)
+    const payload = JSON.parse(payloadJson)
+    const now = Math.floor(Date.now() / 1000)
+    return payload.exp ? payload.exp < now : true
+  } catch {
+    return true
+  }
+}
