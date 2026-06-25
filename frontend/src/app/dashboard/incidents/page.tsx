@@ -348,11 +348,11 @@ function IncidentsPageContent() {
       const payload: Record<string, unknown> = {
         type: form.type,
         description: form.description,
-        address: form.address.trim(),
-        lat: form.lat ? parseFloat(form.lat) : null,
-        lng: form.lng ? parseFloat(form.lng) : null,
-        imageUrl: imageUrl || null,
       }
+      if (form.address.trim()) payload.address = form.address.trim()
+      if (form.lat) payload.lat = parseFloat(form.lat)
+      if (form.lng) payload.lng = parseFloat(form.lng)
+      if (imageUrl) payload.imageUrl = imageUrl
 
       if (editingIncident) {
         // En edición, si el usuario es admin/operador y modificó el estado en el form,
