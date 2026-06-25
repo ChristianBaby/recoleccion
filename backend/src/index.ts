@@ -62,7 +62,12 @@ app.use(express.urlencoded({ extended: true }))
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: 'no-global-ratelimit',
+    frontendUrl: process.env.FRONTEND_URL ?? '(no configurado)',
+  })
 })
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
