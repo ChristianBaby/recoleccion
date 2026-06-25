@@ -60,11 +60,17 @@ export async function getIncident(id: string, userId: string, role: string) {
   return incident
 }
 
-// ─── RF-11: Crear incidencia ──────────────────────────────────────────────────
-
 export async function createIncident(input: CreateIncidentInput, citizenId: string) {
-  const citizen = await prisma.user.findUnique({ where: { id: citizenId }, select: { zoneId: true } })
-  if (!citizen?.zoneId) {
+  const citizen = await prisma.user.findUnique({
+    where: { id: citizenId },
+    select: { zoneId: true, role: true }
+  })
+  
+  if (!citizen) {
+    throw { status: 404, message: 'Usuario no encontrado' }
+  }
+
+  if (citizen.role !== 'ADMIN' && citizen.role !== 'OPERATOR' && !citizen.zoneId) {
     throw { status: 403, message: 'Debes tener una zona asignada para reportar incidencias' }
   }
 

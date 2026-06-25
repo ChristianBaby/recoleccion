@@ -60,8 +60,8 @@ describe('Pruebas del Servicio de Reporte de Incidencias - HU-08 (RF-11)', () =>
   });
 
   it('Debe rechazar la creacion con error 403 si el ciudadano no tiene zona asignada', async () => {
-    // Ciudadano sin zona asignada (zoneId: null)
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'citizen-123', zoneId: null });
+    // Ciudadano sin zona asignada (zoneId: null, role: 'CITIZEN')
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'citizen-123', zoneId: null, role: 'CITIZEN' });
 
     await expect(createIncident({
       type: 'DAMAGED_CONTAINER',
@@ -76,6 +76,40 @@ describe('Pruebas del Servicio de Reporte de Incidencias - HU-08 (RF-11)', () =>
     });
 
     expect(prisma.incident.create).not.toHaveBeenCalled();
+  });
+
+  it('Debe permitir crear una incidencia exitosamente a un Administrador que no tiene zona asignada', async () => {
+    // Admin sin zona asignada (zoneId: null, role: 'ADMIN')
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'admin-123', zoneId: null, role: 'ADMIN' });
+    
+    // Mock de buscar por codigo unico (para el bucle de generacion)
+    (prisma.incident.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const mockCreatedIncident = {
+      id: 'inc-002',
+      type: 'WASTE_ACCUMULATION',
+      description: 'Reporte registrado por el administrador del sistema',
+      status: 'OPEN',
+      trackingCode: 'INC-2026-54321',
+      lat: -13.52,
+      lng: -71.96,
+      address: 'Plaza de Armas Cusco',
+      createdAt: new Date(),
+    };
+    (prisma.incident.create as jest.Mock).mockResolvedValue(mockCreatedIncident);
+
+    const result = await createIncident({
+      type: 'WASTE_ACCUMULATION',
+      description: 'Reporte registrado por el administrador del sistema',
+      imageUrl: undefined,
+      lat: -13.52,
+      lng: -71.96,
+      address: 'Plaza de Armas Cusco',
+    }, 'admin-123');
+
+    expect(result).toBeDefined();
+    expect(result.trackingCode).toMatch(/^INC-\d{4}-\d{5}$/);
+    expect(prisma.incident.create).toHaveBeenCalled();
   });
 
   it('Debe lanzar error 403 si un ciudadano intenta obtener una incidencia ajena', async () => {
