@@ -121,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
             <Leaf size={16} className="text-white" />
           </div>
-          <span className="font-semibold text-slate-900 text-sm">EcoRutas Cusco</span>
+          <span className="font-semibold text-slate-900 text-sm">Gestión de Residuos</span>
         </div>
 
         {/* Navigation */}

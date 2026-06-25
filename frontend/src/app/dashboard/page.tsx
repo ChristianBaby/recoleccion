@@ -198,7 +198,7 @@ export default function DashboardPage() {
           Bienvenido, {user?.firstName}
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Panel de gestión · EcoRutas Cusco
+          Panel de gestión · Gestión de Residuos
         </p>
       </div>
 

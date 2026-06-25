@@ -63,7 +63,7 @@ export default function LoginPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Iniciar sesión</h1>
-        <p className="text-slate-500 mt-1 text-sm">Accede a tu cuenta de EcoRutas</p>
+        <p className="text-slate-500 mt-1 text-sm">Accede al Sistema de Recolección</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
